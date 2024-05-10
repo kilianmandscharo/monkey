@@ -33,54 +33,62 @@ impl Lexer {
         self.skip_whitespace();
 
         let tok = match self.ch {
-            '=' => {
-                if self.peek_char() == '=' {
-                    self.read_char();
-                    Token::new_from_string(TokenType::Eq, "==".to_string())
-                } else {
-                    Token::new(TokenType::Assign, self.ch)
-                }
-            }
             ';' => Token::new(TokenType::Semicolon, self.ch),
+            '}' => Token::new(TokenType::RBrace, self.ch),
+            ',' => Token::new(TokenType::Comma, self.ch),
             '(' => Token::new(TokenType::LParen, self.ch),
             ')' => Token::new(TokenType::RParen, self.ch),
-            ',' => Token::new(TokenType::Comma, self.ch),
+            '{' => Token::new(TokenType::LBrace, self.ch),
             '+' => Token::new(TokenType::Plus, self.ch),
             '-' => Token::new(TokenType::Minus, self.ch),
-            '!' => {
-                if self.peek_char() == '=' {
-                    self.read_char();
-                    Token::new_from_string(TokenType::NotEq, "!=".to_string())
-                } else {
-                    Token::new(TokenType::Bang, self.ch)
-                }
-            }
-            '/' => Token::new(TokenType::Slash, self.ch),
             '*' => Token::new(TokenType::Asterisk, self.ch),
+            '/' => Token::new(TokenType::Slash, self.ch),
             '<' => Token::new(TokenType::LT, self.ch),
             '>' => Token::new(TokenType::GT, self.ch),
-            '{' => Token::new(TokenType::LBrace, self.ch),
-            '}' => Token::new(TokenType::RBrace, self.ch),
+            '!' => self.match_bang(),
+            '=' => self.match_equal(),
             '\0' => Token::new(TokenType::Eof, self.ch),
-            ch => {
-                if allowed_in_ident(ch) {
-                    let literal = self.read_identifier();
-                    return Token {
-                        t: lookup_ident(&literal),
-                        literal,
-                    };
-                } else if ch.is_digit(10) {
-                    return Token {
-                        t: TokenType::Int,
-                        literal: self.read_number(),
-                    };
-                } else {
-                    Token::new(TokenType::Illegal, self.ch)
-                }
-            }
+            ch => return self.match_char(ch),
         };
+
         self.read_char();
+
         tok
+    }
+
+    fn match_equal(&mut self) -> Token {
+        if self.peek_char() == '=' {
+            self.read_char();
+            Token::from_string(TokenType::Eq, "==".to_string())
+        } else {
+            Token::new(TokenType::Assign, self.ch)
+        }
+    }
+
+    fn match_bang(&mut self) -> Token {
+        if self.peek_char() == '=' {
+            self.read_char();
+            Token::from_string(TokenType::NotEq, "!=".to_string())
+        } else {
+            Token::new(TokenType::Bang, self.ch)
+        }
+    }
+
+    fn match_char(&mut self, ch: char) -> Token {
+        if self.allowed_in_ident(ch) {
+            let literal = self.read_identifier();
+            Token {
+                t: lookup_ident(&literal),
+                literal,
+            }
+        } else if ch.is_digit(10) {
+            Token {
+                t: TokenType::Int,
+                literal: self.read_number(),
+            }
+        } else {
+            Token::new(TokenType::Illegal, self.ch)
+        }
     }
 
     fn read_number(&mut self) -> String {
@@ -93,7 +101,7 @@ impl Lexer {
 
     fn read_identifier(&mut self) -> String {
         let position = self.position;
-        while allowed_in_ident(self.ch) {
+        while self.allowed_in_ident(self.ch) {
             self.read_char();
         }
         self.input[position..self.position].iter().collect()
@@ -112,10 +120,10 @@ impl Lexer {
             self.input[self.read_position]
         }
     }
-}
 
-fn allowed_in_ident(ch: char) -> bool {
-    ch.is_ascii_alphabetic() || ch == '_'
+    fn allowed_in_ident(&self, ch: char) -> bool {
+        ch.is_ascii_alphabetic() || ch == '_'
+    }
 }
 
 #[cfg(test)]
@@ -228,6 +236,7 @@ mod tests {
 
         for test in tests {
             let tok = l.next_token();
+            println!("{tok:?}");
             let (expected_type, expected_literal) = test;
             assert_eq!(tok.t, expected_type);
             assert_eq!(tok.literal, expected_literal);

@@ -1,6 +1,4 @@
-use std::fmt::Display;
-
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum TokenType {
     Illegal,
     Eof,
@@ -54,8 +52,9 @@ impl Token {
             literal: ch.to_string(),
         }
     }
-    pub fn new_from_string(t: TokenType, s: String) -> Self {
-        Self { t, literal: s }
+
+    pub fn from_string(t: TokenType, literal: String) -> Self {
+        Self { t, literal }
     }
 }
 
