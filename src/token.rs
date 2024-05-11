@@ -45,6 +45,15 @@ pub struct Token {
     pub literal: String,
 }
 
+impl std::default::Default for Token {
+    fn default() -> Self {
+        Self {
+            t: TokenType::Illegal,
+            literal: "illegal".to_string(),
+        }
+    }
+}
+
 impl Token {
     pub fn new(t: TokenType, ch: char) -> Self {
         Self {

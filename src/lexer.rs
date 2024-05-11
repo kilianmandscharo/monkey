@@ -8,7 +8,7 @@ pub struct Lexer {
 }
 
 impl Lexer {
-    pub fn new(input: String) -> Self {
+    pub fn new(input: &str) -> Self {
         let mut l = Self {
             input: input.chars().collect(),
             position: 0,
@@ -232,7 +232,7 @@ mod tests {
             (TokenType::Eof, "\0"),
         ];
 
-        let mut l = Lexer::new(input.to_string());
+        let mut l = Lexer::new(input);
 
         for test in tests {
             let tok = l.next_token();

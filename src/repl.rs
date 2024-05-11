@@ -10,7 +10,7 @@ pub fn start() -> io::Result<usize> {
         let mut input = String::new();
         io::stdin().read_line(&mut input)?;
 
-        let mut lexer = Lexer::new(input.clone());
+        let mut lexer = Lexer::new(&input);
         loop {
             match lexer.next_token() {
                 Token {
