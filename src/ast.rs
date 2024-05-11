@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use std::mem;
 
 use crate::lexer::Lexer;
@@ -24,7 +25,7 @@ enum Node {
 
 enum Statement {
     LetStatement(LetStatement),
-    ReturnStatement,
+    ReturnStatement(ReturnStatement),
     IfStatement,
 }
 
@@ -40,6 +41,11 @@ struct LetStatement {
 
 struct Identifier {
     token: Token,
+}
+
+struct ReturnStatement {
+    token: Token,
+    return_value: Expression,
 }
 
 struct Program {
@@ -97,10 +103,26 @@ impl Parser {
     fn parse_statement(&mut self) -> Result<Statement> {
         match self.cur_token.t {
             TokenType::Let => Ok(Statement::LetStatement(self.parse_let_statement()?)),
+            TokenType::Return => Ok(Statement::ReturnStatement(self.parse_return_statement()?)),
             _ => Err(ParsingError::new(
                 "encountered unknown statement".to_string(),
             )),
         }
+    }
+
+    fn parse_return_statement(&mut self) -> Result<ReturnStatement> {
+        let token = mem::take(&mut self.cur_token);
+
+        self.next_token();
+
+        while !self.cur_token_is(TokenType::Semicolon) {
+            self.next_token();
+        }
+
+        Ok(ReturnStatement {
+            token,
+            return_value: Expression::Placeholder,
+        })
     }
 
     fn parse_let_statement(&mut self) -> Result<LetStatement> {
@@ -165,12 +187,7 @@ mod tests {
         let mut parser = Parser::new(lexer);
         let program = parser.parse_program().expect("program to parse");
 
-        if parser.errors.len() > 0 {
-            for error in &parser.errors {
-                println!("ERROR: {}", error.message);
-            }
-            panic!("found {} parsing errors", parser.errors.len());
-        }
+        check_parser_errors(&parser);
 
         assert_eq!(3, program.statements.len());
 
@@ -185,6 +202,41 @@ mod tests {
                     panic!("not a let statement");
                 }
             }
+        }
+    }
+
+    #[test]
+    fn test_return_statements() {
+        let input = r#"
+            return 5;
+            return 10;
+            return 993322;
+        "#;
+
+        let lexer = lexer::Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program().expect("program to parse");
+
+        check_parser_errors(&parser);
+
+        assert_eq!(3, program.statements.len());
+
+        for statement in &program.statements {
+            match statement {
+                Statement::ReturnStatement(_) => {}
+                _ => {
+                    panic!("not a return statement");
+                }
+            }
+        }
+    }
+
+    fn check_parser_errors(parser: &Parser) {
+        if parser.errors.len() > 0 {
+            for error in &parser.errors {
+                println!("ERROR: {}", error.message);
+            }
+            panic!("found {} parsing errors", parser.errors.len());
         }
     }
 }
