@@ -1,4 +1,4 @@
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub enum TokenType {
     Illegal,
     Eof,
@@ -64,6 +64,13 @@ impl Token {
 
     pub fn from_string(t: TokenType, literal: String) -> Self {
         Self { t, literal }
+    }
+
+    pub fn from_str(t: TokenType, literal: &str) -> Self {
+        Self {
+            t,
+            literal: literal.to_string(),
+        }
     }
 }
 

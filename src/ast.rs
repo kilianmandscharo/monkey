@@ -1,21 +1,19 @@
 #![allow(dead_code)]
-use std::mem;
 
-use crate::lexer::Lexer;
-use crate::token::{Token, TokenType};
+use crate::token::Token;
 
 #[derive(Debug, Clone)]
-struct ParsingError {
-    message: String,
+pub struct ParsingError {
+    pub message: String,
 }
 
 impl ParsingError {
-    fn new(message: String) -> Self {
+    pub fn new(message: String) -> Self {
         ParsingError { message }
     }
 }
 
-type Result<T> = std::result::Result<T, ParsingError>;
+pub type Result<T> = std::result::Result<T, ParsingError>;
 
 enum Node {
     Program(Program),
@@ -23,220 +21,145 @@ enum Node {
     Expression(Expression),
 }
 
-enum Statement {
+pub struct Program {
+    pub statements: Vec<Statement>,
+}
+
+impl std::fmt::Display for Program {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            self.statements
+                .iter()
+                .map(|statement| statement.to_string())
+                .collect::<Vec<String>>()
+                .join("\n")
+        )
+    }
+}
+
+pub enum Statement {
     LetStatement(LetStatement),
     ReturnStatement(ReturnStatement),
-    IfStatement,
+    ExpressionStatement(ExpressionStatement),
 }
 
-enum Expression {
-    Placeholder,
-}
-
-struct LetStatement {
-    token: Token,
-    name: Identifier,
-    value: Expression,
-}
-
-struct Identifier {
-    token: Token,
-}
-
-struct ReturnStatement {
-    token: Token,
-    return_value: Expression,
-}
-
-struct Program {
-    statements: Vec<Statement>,
-}
-
-struct Parser {
-    lexer: Lexer,
-    cur_token: Token,
-    peek_token: Token,
-    errors: Vec<ParsingError>,
-}
-
-impl Parser {
-    fn new(lexer: Lexer) -> Self {
-        let mut parser = Self {
-            lexer,
-            cur_token: Token::new(TokenType::Illegal, 'x'),
-            peek_token: Token::new(TokenType::Illegal, 'x'),
-            errors: Vec::new(),
-        };
-        parser.next_token();
-        parser.next_token();
-        parser
-    }
-
-    fn next_token(&mut self) {
-        mem::swap(&mut self.cur_token, &mut self.peek_token);
-        self.peek_token = self.lexer.next_token();
-    }
-
-    fn parse_program(&mut self) -> Result<Program> {
-        let mut program = Program {
-            statements: Vec::new(),
-        };
-
-        loop {
-            match self.cur_token.t {
-                TokenType::Eof => {
-                    break;
-                }
-                _ => {
-                    match self.parse_statement() {
-                        Ok(statement) => program.statements.push(statement),
-                        Err(error) => self.errors.push(error),
-                    };
-                    self.next_token();
-                }
+impl std::fmt::Display for Statement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let content = match self {
+            Statement::LetStatement(let_statement) => let_statement.to_string(),
+            Statement::ReturnStatement(return_statement) => return_statement.to_string(),
+            Statement::ExpressionStatement(expression_statement) => {
+                expression_statement.to_string()
             }
-        }
-
-        Ok(program)
-    }
-
-    fn parse_statement(&mut self) -> Result<Statement> {
-        match self.cur_token.t {
-            TokenType::Let => Ok(Statement::LetStatement(self.parse_let_statement()?)),
-            TokenType::Return => Ok(Statement::ReturnStatement(self.parse_return_statement()?)),
-            _ => Err(ParsingError::new(
-                "encountered unknown statement".to_string(),
-            )),
-        }
-    }
-
-    fn parse_return_statement(&mut self) -> Result<ReturnStatement> {
-        let token = mem::take(&mut self.cur_token);
-
-        self.next_token();
-
-        while !self.cur_token_is(TokenType::Semicolon) {
-            self.next_token();
-        }
-
-        Ok(ReturnStatement {
-            token,
-            return_value: Expression::Placeholder,
-        })
-    }
-
-    fn parse_let_statement(&mut self) -> Result<LetStatement> {
-        let token = mem::take(&mut self.cur_token);
-
-        self.expect_peek(TokenType::Ident)?;
-
-        let name = Identifier {
-            token: mem::take(&mut self.cur_token),
         };
-
-        self.expect_peek(TokenType::Assign)?;
-
-        while !self.cur_token_is(TokenType::Semicolon) {
-            self.next_token();
-        }
-
-        Ok(LetStatement {
-            token,
-            name,
-            value: Expression::Placeholder,
-        })
+        write!(f, "{}", content)
     }
+}
 
-    fn expect_peek(&mut self, t: TokenType) -> Result<()> {
-        if self.peek_token_is(t) {
-            self.next_token();
-            return Ok(());
-        }
-        Err(ParsingError::new(format!(
-            "expected token type '{:?}', received '{:?}'",
-            t, self.peek_token.t
-        )))
+pub struct LetStatement {
+    pub token: Token,
+    pub name: Identifier,
+    pub value: Expression,
+}
+
+impl std::fmt::Display for LetStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} {} = {};",
+            self.token.literal,
+            self.name.to_string(),
+            self.value.to_string()
+        )
     }
+}
 
-    fn cur_token_is(&self, t: TokenType) -> bool {
-        t == self.cur_token.t
+pub struct ReturnStatement {
+    pub token: Token,
+    pub return_value: Expression,
+}
+
+impl std::fmt::Display for ReturnStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} {};",
+            self.token.literal,
+            self.return_value.to_string()
+        )
     }
+}
 
-    fn peek_token_is(&self, t: TokenType) -> bool {
-        t == self.peek_token.t
+pub struct ExpressionStatement {
+    pub token: Token,
+    pub expression: Expression,
+}
+
+impl std::fmt::Display for ExpressionStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.expression.to_string())
+    }
+}
+
+pub struct Identifier {
+    pub token: Token,
+}
+
+impl std::fmt::Display for Identifier {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.token.literal)
+    }
+}
+
+pub struct IntegerLiteral {
+    pub token: Token,
+    pub value: i64,
+}
+
+impl std::fmt::Display for IntegerLiteral {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.token.literal)
+    }
+}
+
+pub enum Expression {
+    Placeholder(String),
+    Identifier(Identifier),
+    IntegerLiteral(IntegerLiteral),
+}
+
+impl std::fmt::Display for Expression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let content = match self {
+            Expression::Placeholder(_) => "placeholder".to_string(),
+            Expression::Identifier(identifier) => identifier.to_string(),
+            Expression::IntegerLiteral(integer_literal) => integer_literal.to_string(),
+        };
+        write!(f, "{}", content)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use core::panic;
-
-    use crate::lexer;
+    use crate::token::TokenType;
 
     use super::*;
 
     #[test]
-    fn test_let_statement() {
-        let input = r#"
-            let x = 5;
-            let y = 10;
-            let foobar = 838383;
-        "#;
-
-        let lexer = lexer::Lexer::new(input);
-        let mut parser = Parser::new(lexer);
-        let program = parser.parse_program().expect("program to parse");
-
-        check_parser_errors(&parser);
-
-        assert_eq!(3, program.statements.len());
-
-        let tests = vec!["x", "y", "foobar"];
-        for (i, expected_identifier) in tests.into_iter().enumerate() {
-            match &program.statements[i] {
-                Statement::LetStatement(let_statement) => {
-                    assert_eq!("let", let_statement.token.literal);
-                    assert_eq!(expected_identifier, let_statement.name.token.literal);
-                }
-                _ => {
-                    panic!("not a let statement");
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_return_statements() {
-        let input = r#"
-            return 5;
-            return 10;
-            return 993322;
-        "#;
-
-        let lexer = lexer::Lexer::new(input);
-        let mut parser = Parser::new(lexer);
-        let program = parser.parse_program().expect("program to parse");
-
-        check_parser_errors(&parser);
-
-        assert_eq!(3, program.statements.len());
-
-        for statement in &program.statements {
-            match statement {
-                Statement::ReturnStatement(_) => {}
-                _ => {
-                    panic!("not a return statement");
-                }
-            }
-        }
-    }
-
-    fn check_parser_errors(parser: &Parser) {
-        if parser.errors.len() > 0 {
-            for error in &parser.errors {
-                println!("ERROR: {}", error.message);
-            }
-            panic!("found {} parsing errors", parser.errors.len());
-        }
+    fn test_string() {
+        let program = Program {
+            statements: vec![Statement::LetStatement(LetStatement {
+                token: Token::from_str(TokenType::Let, "let"),
+                name: Identifier {
+                    token: Token::from_str(TokenType::Ident, "myVar"),
+                },
+                value: Expression::Identifier(Identifier {
+                    token: Token::from_str(TokenType::Ident, "anotherVar"),
+                }),
+            })],
+        };
+        assert_eq!("let myVar = anotherVar;", program.to_string());
     }
 }

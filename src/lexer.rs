@@ -236,7 +236,6 @@ mod tests {
 
         for test in tests {
             let tok = l.next_token();
-            println!("{tok:?}");
             let (expected_type, expected_literal) = test;
             assert_eq!(tok.t, expected_type);
             assert_eq!(tok.literal, expected_literal);
