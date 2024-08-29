@@ -34,7 +34,7 @@ impl std::fmt::Display for Program {
                 .iter()
                 .map(|statement| statement.to_string())
                 .collect::<Vec<String>>()
-                .join("\n")
+                .join("")
         )
     }
 }
@@ -124,18 +124,53 @@ impl std::fmt::Display for IntegerLiteral {
     }
 }
 
+pub struct PrefixExpression {
+    pub token: Token,
+    pub operator: String,
+    pub right: Box<Expression>,
+}
+
+impl std::fmt::Display for PrefixExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({}{})", self.operator, self.right.to_string())
+    }
+}
+
+pub struct InfixExpression {
+    pub token: Token,
+    pub left: Box<Expression>,
+    pub operator: String,
+    pub right: Box<Expression>,
+}
+
+impl std::fmt::Display for InfixExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "({} {} {})",
+            self.left.to_string(),
+            self.operator,
+            self.right.to_string()
+        )
+    }
+}
+
 pub enum Expression {
-    Placeholder(String),
+    Placeholder(),
     Identifier(Identifier),
     IntegerLiteral(IntegerLiteral),
+    PrefixExpression(PrefixExpression),
+    InfixExpression(InfixExpression),
 }
 
 impl std::fmt::Display for Expression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let content = match self {
-            Expression::Placeholder(_) => "placeholder".to_string(),
+            Expression::Placeholder() => "placeholder".to_string(),
             Expression::Identifier(identifier) => identifier.to_string(),
             Expression::IntegerLiteral(integer_literal) => integer_literal.to_string(),
+            Expression::PrefixExpression(prefix_expression) => prefix_expression.to_string(),
+            Expression::InfixExpression(infix_expression) => infix_expression.to_string(),
         };
         write!(f, "{}", content)
     }
