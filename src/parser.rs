@@ -204,16 +204,12 @@ impl Parser {
         let operator = token.literal.clone();
         let right = Box::new(Expression::Placeholder());
 
-        eprintln!("token: {token:?}");
-
         let mut expression = InfixExpression {
             token,
             operator,
             right,
             left,
         };
-
-        eprintln!("precedence: {precedence:?}");
 
         self.next_token();
 
@@ -250,8 +246,6 @@ impl Parser {
         };
 
         let mut left = prefix(self)?;
-
-        eprintln!("{}", left.to_string());
 
         while !self.peek_token_is(TokenType::Semicolon) && precedence < self.peek_precedence() {
             let infix = match self.infix_parse_fns.get(&self.peek_token.t) {
@@ -325,6 +319,9 @@ impl Parser {
 
 #[cfg(test)]
 mod tests {
+    use core::panic;
+    use std::any::Any;
+
     use crate::lexer;
 
     use super::*;
@@ -500,16 +497,9 @@ mod tests {
             assert_eq!(1, program.statements.len());
 
             match &program.statements[0] {
-                Statement::ExpressionStatement(stmt) => match &stmt.expression {
-                    Expression::InfixExpression(infix_expression) => {
-                        test_integer_literal(&infix_expression.left, left_value);
-                        assert_eq!(infix_expression.operator, operator);
-                        test_integer_literal(&infix_expression.right, right_value);
-                    }
-                    _ => {
-                        panic!("not an infix expression");
-                    }
-                },
+                Statement::ExpressionStatement(ref stmt) => {
+                    test_infix_expression(&stmt.expression, &left_value, operator, &right_value);
+                }
                 _ => {
                     panic!("not an expression statement");
                 }
@@ -558,13 +548,54 @@ mod tests {
         }
     }
 
-    fn test_integer_literal(integer_literal: &Box<Expression>, value: i64) {
-        match **integer_literal {
+    fn test_integer_literal(integer_literal: &Expression, value: i64) {
+        match *integer_literal {
             Expression::IntegerLiteral(ref integer_literal) => {
                 assert_eq!(integer_literal.value, value);
                 assert_eq!(integer_literal.token.literal, value.to_string());
             }
             _ => panic!("not an integer literal"),
+        }
+    }
+
+    fn test_identifier(identifier: &Expression, value: &str) {
+        match *identifier {
+            Expression::Identifier(ref identifier) => {
+                assert_eq!(identifier.token.literal, value);
+            }
+            _ => panic!("not an identifier"),
+        }
+    }
+
+    fn test_literal_expression(expression: &Expression, expected: &dyn Any) {
+        if let Some(integer) = expected.downcast_ref::<i64>() {
+            test_integer_literal(expression, *integer);
+            return;
+        }
+        if let Some(integer) = expected.downcast_ref::<i32>() {
+            test_integer_literal(expression, *integer as i64);
+            return;
+        }
+        if let Some(string) = expected.downcast_ref::<&str>() {
+            test_identifier(expression, string);
+            return;
+        }
+        panic!("type of expected can't be handled");
+    }
+
+    fn test_infix_expression(
+        expression: &Expression,
+        left: &dyn Any,
+        operator: &str,
+        right: &dyn Any,
+    ) {
+        match *expression {
+            Expression::InfixExpression(ref infix_expression) => {
+                test_literal_expression(&infix_expression.left, left);
+                assert_eq!(operator, infix_expression.operator);
+                test_literal_expression(&infix_expression.right, right);
+            }
+            _ => panic!("not an infix expression"),
         }
     }
 
