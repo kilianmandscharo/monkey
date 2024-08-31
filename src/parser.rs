@@ -4,8 +4,9 @@ use std::{collections::HashMap, mem};
 
 use crate::{
     ast::{
-        Boolean, Expression, ExpressionStatement, Identifier, InfixExpression, IntegerLiteral,
-        LetStatement, ParsingError, PrefixExpression, Program, Result, ReturnStatement, Statement,
+        BlockStatement, Boolean, Expression, ExpressionStatement, Identifier, IfExpression,
+        InfixExpression, IntegerLiteral, LetStatement, ParsingError, PrefixExpression, Program,
+        Result, ReturnStatement, Statement,
     },
     lexer::Lexer,
     token::{Token, TokenType},
@@ -82,6 +83,7 @@ impl Parser {
         parser.register_prefix(TokenType::Bang, Parser::parse_prefix_expression);
         parser.register_prefix(TokenType::Minus, Parser::parse_prefix_expression);
         parser.register_prefix(TokenType::LParen, Parser::parse_grouped_expression);
+        parser.register_prefix(TokenType::If, Parser::parse_if_expression);
 
         parser.register_infix(TokenType::Plus, Parser::parse_infix_expression);
         parser.register_infix(TokenType::Minus, Parser::parse_infix_expression);
@@ -236,6 +238,34 @@ impl Parser {
         }
     }
 
+    fn parse_if_expression(&mut self) -> Result<Expression> {
+        let token = mem::take(&mut self.cur_token);
+
+        self.expect_peek(TokenType::LParen)?;
+        self.next_token();
+
+        let condition = self.parse_expression(Precedence::Lowest)?;
+
+        self.expect_peek(TokenType::RParen)?;
+        self.expect_peek(TokenType::LBrace)?;
+
+        let consequence = self.parse_block_statement()?;
+        let alternative = if self.peek_token_is(TokenType::Else) {
+            self.next_token();
+            self.expect_peek(TokenType::LBrace)?;
+            Some(self.parse_block_statement()?)
+        } else {
+            None
+        };
+
+        Ok(Expression::IfExpression(IfExpression {
+            token,
+            condition: Box::new(condition),
+            consequence,
+            alternative,
+        }))
+    }
+
     fn parse_statement(&mut self) -> Result<Statement> {
         match self.cur_token.t {
             TokenType::Let => Ok(Statement::LetStatement(self.parse_let_statement()?)),
@@ -244,6 +274,23 @@ impl Parser {
                 self.parse_expressions_statement()?,
             )),
         }
+    }
+
+    fn parse_block_statement(&mut self) -> Result<BlockStatement> {
+        let mut block_statement = BlockStatement {
+            token: mem::take(&mut self.cur_token),
+            statements: Vec::new(),
+        };
+
+        self.next_token();
+
+        while !self.cur_token_is(TokenType::RBrace) && !self.cur_token_is(TokenType::Eof) {
+            let statement = self.parse_statement()?;
+            block_statement.statements.push(statement);
+            self.next_token();
+        }
+
+        Ok(block_statement)
     }
 
     fn parse_expressions_statement(&mut self) -> Result<ExpressionStatement> {
@@ -590,6 +637,93 @@ mod tests {
             let actual = program.to_string();
 
             assert_eq!(expected, actual);
+        }
+    }
+
+    #[test]
+    fn test_if_expression() {
+        let input = "if (x < y) { x }";
+
+        let lexer = lexer::Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program().expect("program to parse");
+
+        check_parser_errors(&parser);
+
+        assert_eq!(1, program.statements.len());
+
+        let expression = match &program.statements[0] {
+            Statement::ExpressionStatement(stmt) => &stmt.expression,
+            _ => panic!("not an expression statement"),
+        };
+
+        let if_expression = match expression {
+            Expression::IfExpression(if_expression) => if_expression,
+            _ => panic!("not an if expression"),
+        };
+
+        test_infix_expression(&if_expression.condition, &"x", "<", &"y");
+        assert_eq!(1, if_expression.consequence.statements.len());
+
+        match if_expression.consequence.statements[0] {
+            Statement::ExpressionStatement(ref expression_statement) => {
+                test_identifier(&expression_statement.expression, "x");
+            }
+            _ => panic!("not an expression statement"),
+        };
+
+        if let Some(_) = if_expression.alternative {
+            panic!("alternative statements were not None")
+        }
+    }
+
+    #[test]
+    fn test_if_else_expression() {
+        let input = "if (x < y) { x } else { y }";
+
+        let lexer = lexer::Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program().expect("program to parse");
+
+        check_parser_errors(&parser);
+
+        assert_eq!(1, program.statements.len());
+
+        let expression = match &program.statements[0] {
+            Statement::ExpressionStatement(stmt) => &stmt.expression,
+            _ => panic!("not an expression statement"),
+        };
+
+        let if_expression = match expression {
+            Expression::IfExpression(if_expression) => if_expression,
+            _ => panic!("not an if expression"),
+        };
+
+        test_infix_expression(&if_expression.condition, &"x", "<", &"y");
+        assert_eq!(1, if_expression.consequence.statements.len());
+
+        match if_expression.consequence.statements[0] {
+            Statement::ExpressionStatement(ref expression_statement) => {
+                test_identifier(&expression_statement.expression, "x");
+            }
+            _ => panic!("not an expression statement"),
+        };
+
+        let alternative = match &if_expression.alternative {
+            Some(alternative) => alternative,
+            None => panic!("no alternative found"),
+            //Statement::ExpressionStatement(ref expression_statement) => {
+            //    test_identifier(&expression_statement.expression, "x");
+            //}
+            //_ => panic!("not an expression statement"),
+        };
+        assert_eq!(1, alternative.statements.len());
+
+        match alternative.statements[0] {
+            Statement::ExpressionStatement(ref expression_statement) => {
+                test_identifier(&expression_statement.expression, "y");
+            }
+            _ => panic!("not an expression statement"),
         }
     }
 

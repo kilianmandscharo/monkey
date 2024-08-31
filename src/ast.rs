@@ -103,6 +103,25 @@ impl std::fmt::Display for ExpressionStatement {
     }
 }
 
+pub struct BlockStatement {
+    pub token: Token,
+    pub statements: Vec<Statement>,
+}
+
+impl std::fmt::Display for BlockStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            self.statements
+                .iter()
+                .map(|statement| statement.to_string())
+                .collect::<Vec<String>>()
+                .join("")
+        )
+    }
+}
+
 pub struct Identifier {
     pub token: Token,
 }
@@ -166,6 +185,33 @@ impl std::fmt::Display for Boolean {
     }
 }
 
+pub struct IfExpression {
+    pub token: Token,
+    pub condition: Box<Expression>,
+    pub consequence: BlockStatement,
+    pub alternative: Option<BlockStatement>,
+}
+
+impl std::fmt::Display for IfExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.alternative {
+            Some(ref alternative) => write!(
+                f,
+                "if {} {} else {}",
+                self.condition.to_string(),
+                self.consequence.to_string(),
+                alternative.to_string(),
+            ),
+            None => write!(
+                f,
+                "if {} {}",
+                self.condition.to_string(),
+                self.consequence.to_string(),
+            ),
+        }
+    }
+}
+
 pub enum Expression {
     Empty(),
     Identifier(Identifier),
@@ -173,6 +219,7 @@ pub enum Expression {
     PrefixExpression(PrefixExpression),
     InfixExpression(InfixExpression),
     Boolean(Boolean),
+    IfExpression(IfExpression),
 }
 
 impl std::fmt::Display for Expression {
@@ -184,6 +231,7 @@ impl std::fmt::Display for Expression {
             Expression::PrefixExpression(prefix_expression) => prefix_expression.to_string(),
             Expression::InfixExpression(infix_expression) => infix_expression.to_string(),
             Expression::Boolean(boolean) => boolean.to_string(),
+            Expression::IfExpression(if_expression) => if_expression.to_string(),
         };
         write!(f, "{}", content)
     }
