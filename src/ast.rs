@@ -155,12 +155,24 @@ impl std::fmt::Display for InfixExpression {
     }
 }
 
+pub struct Boolean {
+    pub token: Token,
+    pub value: bool,
+}
+
+impl std::fmt::Display for Boolean {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.value)
+    }
+}
+
 pub enum Expression {
     Placeholder(),
     Identifier(Identifier),
     IntegerLiteral(IntegerLiteral),
     PrefixExpression(PrefixExpression),
     InfixExpression(InfixExpression),
+    Boolean(Boolean),
 }
 
 impl std::fmt::Display for Expression {
@@ -171,6 +183,7 @@ impl std::fmt::Display for Expression {
             Expression::IntegerLiteral(integer_literal) => integer_literal.to_string(),
             Expression::PrefixExpression(prefix_expression) => prefix_expression.to_string(),
             Expression::InfixExpression(infix_expression) => infix_expression.to_string(),
+            Expression::Boolean(boolean) => boolean.to_string(),
         };
         write!(f, "{}", content)
     }

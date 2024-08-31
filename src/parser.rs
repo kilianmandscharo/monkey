@@ -4,8 +4,8 @@ use std::{collections::HashMap, mem};
 
 use crate::{
     ast::{
-        Expression, ExpressionStatement, Identifier, InfixExpression, IntegerLiteral, LetStatement,
-        ParsingError, PrefixExpression, Program, Result, ReturnStatement, Statement,
+        Boolean, Expression, ExpressionStatement, Identifier, InfixExpression, IntegerLiteral,
+        LetStatement, ParsingError, PrefixExpression, Program, Result, ReturnStatement, Statement,
     },
     lexer::Lexer,
     token::{Token, TokenType},
@@ -77,6 +77,8 @@ impl Parser {
 
         parser.register_prefix(TokenType::Ident, Parser::parse_identifier);
         parser.register_prefix(TokenType::Int, Parser::parse_integer_literal);
+        parser.register_prefix(TokenType::True, Parser::parse_boolean);
+        parser.register_prefix(TokenType::False, Parser::parse_boolean);
         parser.register_prefix(TokenType::Bang, Parser::parse_prefix_expression);
         parser.register_prefix(TokenType::Minus, Parser::parse_prefix_expression);
 
@@ -180,6 +182,12 @@ impl Parser {
         )))
     }
 
+    fn parse_boolean(&mut self) -> Result<Expression> {
+        let value = self.cur_token_is(TokenType::True);
+        let token = mem::take(&mut self.cur_token);
+        Ok(Expression::Boolean(Boolean { token, value }))
+    }
+
     fn parse_prefix_expression(&mut self) -> Result<Expression> {
         let token = mem::take(&mut self.cur_token);
         let operator = token.literal.clone();
@@ -242,7 +250,12 @@ impl Parser {
     fn parse_expression(&mut self, precedence: Precedence) -> Result<Expression> {
         let prefix = match self.prefix_parse_fns.get(&self.cur_token.t) {
             Some(prefix) => prefix,
-            None => return Err(ParsingError::new("no prefix function".to_string())),
+            None => {
+                return Err(ParsingError::new(format!(
+                    "no prefix function for {:?}",
+                    self.cur_token.t
+                )))
+            }
         };
 
         let mut left = prefix(self)?;
@@ -395,14 +408,7 @@ mod tests {
         assert_eq!(1, program.statements.len());
 
         match &program.statements[0] {
-            Statement::ExpressionStatement(stmt) => match &stmt.expression {
-                Expression::Identifier(ident) => {
-                    assert_eq!("foobar", ident.token.literal);
-                }
-                _ => {
-                    panic!("not an identifier expression");
-                }
-            },
+            Statement::ExpressionStatement(stmt) => test_identifier(&stmt.expression, "foobar"),
             _ => {
                 panic!("not an expression statement");
             }
@@ -422,14 +428,27 @@ mod tests {
         assert_eq!(1, program.statements.len());
 
         match &program.statements[0] {
-            Statement::ExpressionStatement(stmt) => match &stmt.expression {
-                Expression::IntegerLiteral(integer_literal) => {
-                    assert_eq!(5, integer_literal.value);
-                }
-                _ => {
-                    panic!("not an integer literal expression");
-                }
-            },
+            Statement::ExpressionStatement(stmt) => test_integer_literal(&stmt.expression, 5),
+            _ => {
+                panic!("not an expression statement");
+            }
+        }
+    }
+
+    #[test]
+    fn test_boolean_expression() {
+        let input = "true;";
+
+        let lexer = lexer::Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program().expect("program to parse");
+
+        check_parser_errors(&parser);
+
+        assert_eq!(1, program.statements.len());
+
+        match &program.statements[0] {
+            Statement::ExpressionStatement(stmt) => test_boolean_literal(&stmt.expression, true),
             _ => {
                 panic!("not an expression statement");
             }
@@ -438,9 +457,14 @@ mod tests {
 
     #[test]
     fn test_parsing_prefix_expressions() {
-        type Test = (&'static str, &'static str, i64);
+        type Test = (&'static str, &'static str, &'static dyn Any);
 
-        let tests: Vec<Test> = vec![("!5", "!", 5), ("-15", "-", 15)];
+        let tests: Vec<Test> = vec![
+            ("!5", "!", &5),
+            ("-15", "-", &15),
+            ("!true", "!", &true),
+            ("!false", "!", &false),
+        ];
 
         for test in tests {
             let (input, operator, value) = test;
@@ -454,15 +478,9 @@ mod tests {
             assert_eq!(1, program.statements.len());
 
             match &program.statements[0] {
-                Statement::ExpressionStatement(stmt) => match &stmt.expression {
-                    Expression::PrefixExpression(prefix_expression) => {
-                        assert_eq!(prefix_expression.operator, operator);
-                        test_integer_literal(&prefix_expression.right, value);
-                    }
-                    _ => {
-                        panic!("not a prefix expression");
-                    }
-                },
+                Statement::ExpressionStatement(stmt) => {
+                    test_prefix_expression(&stmt.expression, operator, value);
+                }
                 _ => {
                     panic!("not an expression statement");
                 }
@@ -472,17 +490,25 @@ mod tests {
 
     #[test]
     fn test_parsing_infix_expressions() {
-        type Test = (&'static str, i64, &'static str, i64);
+        type Test = (
+            &'static str,
+            &'static dyn Any,
+            &'static str,
+            &'static dyn Any,
+        );
 
         let tests: Vec<Test> = vec![
-            ("5 + 5;", 5, "+", 5),
-            ("5 - 5;", 5, "-", 5),
-            ("5 * 5;", 5, "*", 5),
-            ("5 / 5;", 5, "/", 5),
-            ("5 > 5;", 5, ">", 5),
-            ("5 < 5;", 5, "<", 5),
-            ("5 == 5;", 5, "==", 5),
-            ("5 != 5;", 5, "!=", 5),
+            ("5 + 5;", &5, "+", &5),
+            ("5 - 5;", &5, "-", &5),
+            ("5 * 5;", &5, "*", &5),
+            ("5 / 5;", &5, "/", &5),
+            ("5 > 5;", &5, ">", &5),
+            ("5 < 5;", &5, "<", &5),
+            ("5 == 5;", &5, "==", &5),
+            ("5 != 5;", &5, "!=", &5),
+            ("true == true", &true, "==", &true),
+            ("true != false", &true, "!=", &false),
+            ("false == false", &false, "==", &false),
         ];
 
         for test in tests {
@@ -498,7 +524,7 @@ mod tests {
 
             match &program.statements[0] {
                 Statement::ExpressionStatement(ref stmt) => {
-                    test_infix_expression(&stmt.expression, &left_value, operator, &right_value);
+                    test_infix_expression(&stmt.expression, left_value, operator, right_value);
                 }
                 _ => {
                     panic!("not an expression statement");
@@ -508,7 +534,7 @@ mod tests {
     }
 
     #[test]
-    fn test_operator_precedence() {
+    fn test_operator_precedence_parsing() {
         type Test = (&'static str, &'static str);
 
         let tests: Vec<Test> = vec![
@@ -531,6 +557,10 @@ mod tests {
                 "3 + 4 * 5 == 3 * 1 + 4 * 5",
                 "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
             ),
+            ("true", "true"),
+            ("false", "false"),
+            ("3 > 5 == false", "((3 > 5) == false)"),
+            ("3 < 5 == true", "((3 < 5) == true)"),
         ];
 
         for test in tests {
@@ -558,6 +588,16 @@ mod tests {
         }
     }
 
+    fn test_boolean_literal(boolean: &Expression, value: bool) {
+        match *boolean {
+            Expression::Boolean(ref boolean) => {
+                assert_eq!(boolean.value, value);
+                assert_eq!(boolean.token.literal, value.to_string());
+            }
+            _ => panic!("not a boolean"),
+        }
+    }
+
     fn test_identifier(identifier: &Expression, value: &str) {
         match *identifier {
             Expression::Identifier(ref identifier) => {
@@ -580,6 +620,10 @@ mod tests {
             test_identifier(expression, string);
             return;
         }
+        if let Some(boolean) = expected.downcast_ref::<bool>() {
+            test_boolean_literal(expression, *boolean);
+            return;
+        }
         panic!("type of expected can't be handled");
     }
 
@@ -594,6 +638,16 @@ mod tests {
                 test_literal_expression(&infix_expression.left, left);
                 assert_eq!(operator, infix_expression.operator);
                 test_literal_expression(&infix_expression.right, right);
+            }
+            _ => panic!("not an infix expression"),
+        }
+    }
+
+    fn test_prefix_expression(expression: &Expression, operator: &str, right: &dyn Any) {
+        match *expression {
+            Expression::PrefixExpression(ref prefix_expression) => {
+                assert_eq!(operator, prefix_expression.operator);
+                test_literal_expression(&prefix_expression.right, right);
             }
             _ => panic!("not an infix expression"),
         }
