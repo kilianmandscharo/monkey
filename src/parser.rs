@@ -81,6 +81,7 @@ impl Parser {
         parser.register_prefix(TokenType::False, Parser::parse_boolean);
         parser.register_prefix(TokenType::Bang, Parser::parse_prefix_expression);
         parser.register_prefix(TokenType::Minus, Parser::parse_prefix_expression);
+        parser.register_prefix(TokenType::LParen, Parser::parse_grouped_expression);
 
         parser.register_infix(TokenType::Plus, Parser::parse_infix_expression);
         parser.register_infix(TokenType::Minus, Parser::parse_infix_expression);
@@ -191,7 +192,7 @@ impl Parser {
     fn parse_prefix_expression(&mut self) -> Result<Expression> {
         let token = mem::take(&mut self.cur_token);
         let operator = token.literal.clone();
-        let right = Box::new(Expression::Placeholder());
+        let right = Box::new(Expression::Empty());
 
         let mut expression = PrefixExpression {
             token,
@@ -210,7 +211,7 @@ impl Parser {
         let precedence = self.cur_precedence();
         let token = mem::take(&mut self.cur_token);
         let operator = token.literal.clone();
-        let right = Box::new(Expression::Placeholder());
+        let right = Box::new(Expression::Empty());
 
         let mut expression = InfixExpression {
             token,
@@ -224,6 +225,15 @@ impl Parser {
         expression.right = Box::new(self.parse_expression(precedence)?);
 
         Ok(Expression::InfixExpression(expression))
+    }
+
+    fn parse_grouped_expression(&mut self) -> Result<Expression> {
+        self.next_token();
+        let expression = self.parse_expression(Precedence::Lowest);
+        match self.expect_peek(TokenType::RParen) {
+            Ok(_) => expression,
+            Err(_) => Ok(Expression::Empty()),
+        }
     }
 
     fn parse_statement(&mut self) -> Result<Statement> {
@@ -284,7 +294,7 @@ impl Parser {
 
         Ok(ReturnStatement {
             token,
-            return_value: Expression::Placeholder(),
+            return_value: Expression::Empty(),
         })
     }
 
@@ -306,7 +316,7 @@ impl Parser {
         Ok(LetStatement {
             token,
             name,
-            value: Expression::Placeholder(),
+            value: Expression::Empty(),
         })
     }
 
@@ -561,6 +571,11 @@ mod tests {
             ("false", "false"),
             ("3 > 5 == false", "((3 > 5) == false)"),
             ("3 < 5 == true", "((3 < 5) == true)"),
+            ("1 + (2 + 3) + 4", "((1 + (2 + 3)) + 4)"),
+            ("(5 + 5) * 2", "((5 + 5) * 2)"),
+            ("2 / (5 + 5)", "(2 / (5 + 5))"),
+            ("-(5 + 5)", "(-(5 + 5))"),
+            ("!(true == true)", "(!(true == true))"),
         ];
 
         for test in tests {

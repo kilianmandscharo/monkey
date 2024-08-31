@@ -167,7 +167,7 @@ impl std::fmt::Display for Boolean {
 }
 
 pub enum Expression {
-    Placeholder(),
+    Empty(),
     Identifier(Identifier),
     IntegerLiteral(IntegerLiteral),
     PrefixExpression(PrefixExpression),
@@ -178,7 +178,7 @@ pub enum Expression {
 impl std::fmt::Display for Expression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let content = match self {
-            Expression::Placeholder() => "placeholder".to_string(),
+            Expression::Empty() => "empty".to_string(),
             Expression::Identifier(identifier) => identifier.to_string(),
             Expression::IntegerLiteral(integer_literal) => integer_literal.to_string(),
             Expression::PrefixExpression(prefix_expression) => prefix_expression.to_string(),
