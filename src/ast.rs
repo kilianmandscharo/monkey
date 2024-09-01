@@ -122,6 +122,7 @@ impl std::fmt::Display for BlockStatement {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct Identifier {
     pub token: Token,
 }
@@ -212,6 +213,28 @@ impl std::fmt::Display for IfExpression {
     }
 }
 
+pub struct FunctionLiteral {
+    pub token: Token,
+    pub parameters: Vec<Identifier>,
+    pub body: BlockStatement,
+}
+
+impl std::fmt::Display for FunctionLiteral {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} ({}) {}",
+            self.token.literal,
+            self.parameters
+                .iter()
+                .map(|parameter| parameter.to_string())
+                .collect::<Vec<String>>()
+                .join(", "),
+            self.body.to_string(),
+        )
+    }
+}
+
 pub enum Expression {
     Empty(),
     Identifier(Identifier),
@@ -220,6 +243,7 @@ pub enum Expression {
     InfixExpression(InfixExpression),
     Boolean(Boolean),
     IfExpression(IfExpression),
+    FunctionLiteral(FunctionLiteral),
 }
 
 impl std::fmt::Display for Expression {
@@ -232,6 +256,7 @@ impl std::fmt::Display for Expression {
             Expression::InfixExpression(infix_expression) => infix_expression.to_string(),
             Expression::Boolean(boolean) => boolean.to_string(),
             Expression::IfExpression(if_expression) => if_expression.to_string(),
+            Expression::FunctionLiteral(function_literal) => function_literal.to_string(),
         };
         write!(f, "{}", content)
     }
