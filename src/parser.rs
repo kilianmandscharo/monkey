@@ -4,8 +4,8 @@ use std::{collections::HashMap, mem};
 
 use crate::{
     ast::{
-        BlockStatement, Boolean, Expression, ExpressionStatement, FunctionLiteral, Identifier,
-        IfExpression, InfixExpression, IntegerLiteral, LetStatement, ParsingError,
+        BlockStatement, Boolean, CallExpression, Expression, ExpressionStatement, FunctionLiteral,
+        Identifier, IfExpression, InfixExpression, IntegerLiteral, LetStatement, ParsingError,
         PrefixExpression, Program, Result, ReturnStatement, Statement,
     },
     lexer::Lexer,
@@ -94,6 +94,7 @@ impl Parser {
         parser.register_infix(TokenType::NotEq, Parser::parse_infix_expression);
         parser.register_infix(TokenType::LT, Parser::parse_infix_expression);
         parser.register_infix(TokenType::GT, Parser::parse_infix_expression);
+        parser.register_infix(TokenType::LParen, Parser::parse_call_expression);
 
         parser.next_token();
         parser.next_token();
@@ -115,6 +116,7 @@ impl Parser {
             .insert(TokenType::Slash, Precedence::Product);
         self.precedences
             .insert(TokenType::Asterisk, Precedence::Product);
+        self.precedences.insert(TokenType::LParen, Precedence::Call);
     }
 
     fn peek_precedence(&self) -> Precedence {
@@ -306,6 +308,36 @@ impl Parser {
         self.expect_peek(TokenType::RParen)?;
 
         Ok(identifiers)
+    }
+
+    fn parse_call_expression(&mut self, function: Box<Expression>) -> Result<Expression> {
+        Ok(Expression::CallExpression(CallExpression {
+            token: mem::take(&mut self.cur_token),
+            arguments: self.parse_call_arguments()?,
+            function,
+        }))
+    }
+
+    fn parse_call_arguments(&mut self) -> Result<Vec<Expression>> {
+        let mut args = Vec::new();
+
+        if self.peek_token_is(TokenType::RParen) {
+            self.next_token();
+            return Ok(args);
+        }
+
+        self.next_token();
+        args.push(self.parse_expression(Precedence::Lowest)?);
+
+        while self.peek_token_is(TokenType::Comma) {
+            self.next_token();
+            self.next_token();
+            args.push(self.parse_expression(Precedence::Lowest)?);
+        }
+
+        self.expect_peek(TokenType::RParen)?;
+
+        Ok(args)
     }
 
     fn parse_statement(&mut self) -> Result<Statement> {
@@ -665,6 +697,15 @@ mod tests {
             ("2 / (5 + 5)", "(2 / (5 + 5))"),
             ("-(5 + 5)", "(-(5 + 5))"),
             ("!(true == true)", "(!(true == true))"),
+            ("a + add(b * c) + d", "((a + add((b * c))) + d)"),
+            (
+                "add(a, b, 1, 2 * 3, 4 + 5, add(6, 7 * 8))",
+                "add(a, b, 1, (2 * 3), (4 + 5), add(6, (7 * 8)))",
+            ),
+            (
+                "add(a + b + c * d / f + g)",
+                "add((((a + b) + ((c * d) / f)) + g))",
+            ),
         ];
 
         for test in tests {
@@ -788,7 +829,7 @@ mod tests {
 
         let function_literal = match expression {
             Expression::FunctionLiteral(function_literal) => function_literal,
-            _ => panic!("not an if expression"),
+            _ => panic!("not a function literal"),
         };
 
         assert_eq!(2, function_literal.parameters.len());
@@ -840,7 +881,7 @@ mod tests {
 
             let function_literal = match expression {
                 Expression::FunctionLiteral(function_literal) => function_literal,
-                _ => panic!("not an if expression"),
+                _ => panic!("not an function literal"),
             };
 
             assert_eq!(expected_params.len(), function_literal.parameters.len());
@@ -850,6 +891,82 @@ mod tests {
                     &Expression::Identifier(function_literal.parameters[i].clone()),
                     &identifier,
                 );
+            }
+        }
+    }
+
+    #[test]
+    fn test_call_expression_parsing() {
+        let input = "add(1, 2 * 3, 4 + 5);";
+
+        let lexer = lexer::Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program().expect("program to parse");
+
+        check_parser_errors(&parser);
+
+        assert_eq!(1, program.statements.len());
+
+        let expression = match &program.statements[0] {
+            Statement::ExpressionStatement(stmt) => &stmt.expression,
+            _ => panic!("not an expression statement"),
+        };
+
+        let call_expression = match expression {
+            Expression::CallExpression(call_expression) => call_expression,
+            _ => panic!("not a call expression"),
+        };
+
+        test_identifier(&call_expression.function, "add");
+
+        assert_eq!(3, call_expression.arguments.len());
+
+        test_literal_expression(&call_expression.arguments[0], &1);
+        test_infix_expression(&call_expression.arguments[1], &2, "*", &3);
+        test_infix_expression(&call_expression.arguments[2], &4, "+", &5);
+    }
+
+    #[test]
+    fn test_call_expression_argument_parsing() {
+        type Test = (&'static str, &'static str, Vec<&'static str>);
+
+        let tests: Vec<Test> = vec![
+            ("add();", "add", vec![]),
+            ("add(1);", "add", vec!["1"]),
+            (
+                "add(1, 2 * 3, 4 + 5);",
+                "add",
+                vec!["1", "(2 * 3)", "(4 + 5)"],
+            ),
+        ];
+
+        for test in tests {
+            let (input, expected_ident, expected_args) = test;
+
+            let lexer = lexer::Lexer::new(input);
+            let mut parser = Parser::new(lexer);
+            let program = parser.parse_program().expect("program to parse");
+
+            check_parser_errors(&parser);
+
+            assert_eq!(1, program.statements.len());
+
+            let expression = match &program.statements[0] {
+                Statement::ExpressionStatement(stmt) => &stmt.expression,
+                _ => panic!("not an expression statement"),
+            };
+
+            let call_expression = match expression {
+                Expression::CallExpression(call_expression) => call_expression,
+                _ => panic!("not a call expression"),
+            };
+
+            test_identifier(&call_expression.function, expected_ident);
+
+            assert_eq!(expected_args.len(), call_expression.arguments.len());
+
+            for (i, arg) in expected_args.into_iter().enumerate() {
+                assert_eq!(arg, call_expression.arguments[i].to_string());
             }
         }
     }

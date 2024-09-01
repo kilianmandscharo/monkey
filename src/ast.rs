@@ -235,6 +235,27 @@ impl std::fmt::Display for FunctionLiteral {
     }
 }
 
+pub struct CallExpression {
+    pub token: Token,
+    pub function: Box<Expression>,
+    pub arguments: Vec<Expression>,
+}
+
+impl std::fmt::Display for CallExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}({})",
+            self.function.to_string(),
+            self.arguments
+                .iter()
+                .map(|parameter| parameter.to_string())
+                .collect::<Vec<String>>()
+                .join(", "),
+        )
+    }
+}
+
 pub enum Expression {
     Empty(),
     Identifier(Identifier),
@@ -244,6 +265,7 @@ pub enum Expression {
     Boolean(Boolean),
     IfExpression(IfExpression),
     FunctionLiteral(FunctionLiteral),
+    CallExpression(CallExpression),
 }
 
 impl std::fmt::Display for Expression {
@@ -257,6 +279,7 @@ impl std::fmt::Display for Expression {
             Expression::Boolean(boolean) => boolean.to_string(),
             Expression::IfExpression(if_expression) => if_expression.to_string(),
             Expression::FunctionLiteral(function_literal) => function_literal.to_string(),
+            Expression::CallExpression(call_expression) => call_expression.to_string(),
         };
         write!(f, "{}", content)
     }
