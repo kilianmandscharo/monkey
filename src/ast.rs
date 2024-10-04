@@ -15,10 +15,21 @@ impl ParsingError {
 
 pub type Result<T> = std::result::Result<T, ParsingError>;
 
-enum Node {
+pub enum Node {
     Program(Program),
     Statement(Statement),
     Expression(Expression),
+}
+
+impl std::fmt::Display for Node {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let content = match self {
+            Node::Program(program) => program.to_string(),
+            Node::Statement(statement) => statement.to_string(),
+            Node::Expression(expression) => expression.to_string(),
+        };
+        write!(f, "{content}")
+    }
 }
 
 pub struct Program {

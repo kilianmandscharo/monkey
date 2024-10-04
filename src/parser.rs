@@ -52,18 +52,18 @@ impl PartialOrd for Precedence {
 type PrefixParseFn = for<'a> fn(&'a mut Parser) -> Result<Expression>;
 type InfixParseFn = for<'a> fn(&'a mut Parser, Box<Expression>) -> Result<Expression>;
 
-struct Parser {
+pub struct Parser {
     lexer: Lexer,
     cur_token: Token,
     peek_token: Token,
-    errors: Vec<ParsingError>,
+    pub errors: Vec<ParsingError>,
     prefix_parse_fns: HashMap<TokenType, PrefixParseFn>,
     infix_parse_fns: HashMap<TokenType, InfixParseFn>,
     precedences: HashMap<TokenType, Precedence>,
 }
 
 impl Parser {
-    fn new(lexer: Lexer) -> Self {
+    pub fn new(lexer: Lexer) -> Self {
         let mut parser = Self {
             lexer,
             cur_token: Token::new(TokenType::Illegal, 'x'),
@@ -100,6 +100,13 @@ impl Parser {
         parser.next_token();
 
         parser
+    }
+
+    pub fn print_errors(&self) {
+        eprintln!("parser has {} errors", self.errors.len());
+        for error in &self.errors {
+            eprintln!("ERROR: {}", error.message);
+        }
     }
 
     fn register_precedences(&mut self) {
@@ -146,7 +153,7 @@ impl Parser {
         self.peek_token = self.lexer.next_token();
     }
 
-    fn parse_program(&mut self) -> Result<Program> {
+    pub fn parse_program(&mut self) -> Result<Program> {
         let mut program = Program {
             statements: Vec::new(),
         };
@@ -1055,10 +1062,7 @@ mod tests {
 
     fn check_parser_errors(parser: &Parser) {
         if parser.errors.len() > 0 {
-            eprintln!("parser has {} errors", parser.errors.len());
-            for error in &parser.errors {
-                eprintln!("ERROR: {}", error.message);
-            }
+            parser.print_errors();
             panic!("found {} parsing errors", parser.errors.len());
         }
     }

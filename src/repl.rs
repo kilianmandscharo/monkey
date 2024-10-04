@@ -1,5 +1,6 @@
-use crate::lexer::Lexer;
-use crate::token::{Token, TokenType};
+use crate::ast::Node;
+use crate::parser::Parser;
+use crate::{evaluator, lexer::Lexer};
 use std::io::{self, Write};
 
 const PROMPT: &str = ">> ";
@@ -9,21 +10,15 @@ pub fn start() -> io::Result<usize> {
         print_prompt();
         let mut input = String::new();
         io::stdin().read_line(&mut input)?;
-
-        let mut lexer = Lexer::new(&input);
-        loop {
-            match lexer.next_token() {
-                Token {
-                    t: TokenType::Eof,
-                    literal: _,
-                } => {
-                    break;
-                }
-                token => {
-                    println!("{:?}", token);
-                }
-            }
+        let mut parser = Parser::new(Lexer::new(&input));
+        let program = parser.parse_program().expect("to parse program");
+        if parser.errors.len() > 0 {
+            eprintln!("Looks like we ran into some monkey business here...");
+            parser.print_errors();
+            continue;
         }
+        let evaluated = evaluator::eval(Node::Program(program));
+        println!("{evaluated}");
     }
 }
 
