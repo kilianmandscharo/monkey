@@ -1,10 +1,22 @@
 use std::ops::{Add, Div, Mul, Sub};
 
-#[derive(Clone, Copy)]
 pub enum Object {
     Integer(Integer),
     Boolean(Boolean),
     Null(Null),
+    ReturnValue(ReturnValue),
+}
+
+impl Object {
+    pub fn new_true() -> Self {
+        Object::Boolean(Boolean { value: true })
+    }
+    pub fn new_false() -> Self {
+        Object::Boolean(Boolean { value: false })
+    }
+    pub fn new_null() -> Self {
+        Object::Null(Null {})
+    }
 }
 
 impl std::fmt::Display for Object {
@@ -13,12 +25,22 @@ impl std::fmt::Display for Object {
             Object::Integer(integer) => integer.to_string(),
             Object::Boolean(boolean) => boolean.to_string(),
             Object::Null(null) => null.to_string(),
+            Object::ReturnValue(return_value) => return_value.to_string(),
         };
         write!(f, "{content}")
     }
 }
 
-#[derive(Clone, Copy)]
+pub struct ReturnValue {
+    pub value: Box<Object>,
+}
+
+impl std::fmt::Display for ReturnValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.value)
+    }
+}
+
 pub struct Integer {
     pub value: i64,
 }
@@ -83,7 +105,6 @@ impl PartialOrd for Integer {
     }
 }
 
-#[derive(Clone, Copy)]
 pub struct Boolean {
     pub value: bool,
 }
@@ -106,7 +127,6 @@ impl Boolean {
     }
 }
 
-#[derive(Clone, Copy)]
 pub struct Null {}
 
 impl std::fmt::Display for Null {
