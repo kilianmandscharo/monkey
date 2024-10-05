@@ -54,6 +54,7 @@ pub enum Statement {
     LetStatement(LetStatement),
     ReturnStatement(ReturnStatement),
     ExpressionStatement(ExpressionStatement),
+    BlockStatement(BlockStatement),
 }
 
 impl std::fmt::Display for Statement {
@@ -64,6 +65,7 @@ impl std::fmt::Display for Statement {
             Statement::ExpressionStatement(expression_statement) => {
                 expression_statement.to_string()
             }
+            Statement::BlockStatement(block_statement) => block_statement.to_string(),
         };
         write!(f, "{}", content)
     }

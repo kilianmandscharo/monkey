@@ -1,3 +1,6 @@
+use std::ops::{Add, Div, Mul, Sub};
+
+#[derive(Clone, Copy)]
 pub enum Object {
     Integer(Integer),
     Boolean(Boolean),
@@ -15,6 +18,7 @@ impl std::fmt::Display for Object {
     }
 }
 
+#[derive(Clone, Copy)]
 pub struct Integer {
     pub value: i64,
 }
@@ -31,6 +35,55 @@ impl std::fmt::Display for Integer {
     }
 }
 
+impl Add for Integer {
+    type Output = Integer;
+    fn add(self, rhs: Self) -> Self::Output {
+        Integer {
+            value: self.value + rhs.value,
+        }
+    }
+}
+
+impl Sub for Integer {
+    type Output = Integer;
+    fn sub(self, rhs: Self) -> Self::Output {
+        Integer {
+            value: self.value - rhs.value,
+        }
+    }
+}
+
+impl Mul for Integer {
+    type Output = Integer;
+    fn mul(self, rhs: Self) -> Self::Output {
+        Integer {
+            value: self.value * rhs.value,
+        }
+    }
+}
+
+impl Div for Integer {
+    type Output = Integer;
+    fn div(self, rhs: Self) -> Self::Output {
+        Integer {
+            value: self.value / rhs.value,
+        }
+    }
+}
+
+impl PartialEq for Integer {
+    fn eq(&self, other: &Self) -> bool {
+        self.value == other.value
+    }
+}
+
+impl PartialOrd for Integer {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.value.cmp(&other.value))
+    }
+}
+
+#[derive(Clone, Copy)]
 pub struct Boolean {
     pub value: bool,
 }
@@ -41,12 +94,19 @@ impl std::fmt::Display for Boolean {
     }
 }
 
+impl PartialEq for Boolean {
+    fn eq(&self, other: &Self) -> bool {
+        self.value == other.value
+    }
+}
+
 impl Boolean {
     fn inspect(&self) -> String {
         self.value.to_string()
     }
 }
 
+#[derive(Clone, Copy)]
 pub struct Null {}
 
 impl std::fmt::Display for Null {
