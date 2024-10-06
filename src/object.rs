@@ -1,5 +1,6 @@
 use std::ops::{Add, Div, Mul, Sub};
 
+#[derive(Clone)]
 pub enum Object {
     Integer(Integer),
     Boolean(Boolean),
@@ -51,6 +52,7 @@ impl std::fmt::Display for Object {
     }
 }
 
+#[derive(Clone)]
 pub struct Error {
     pub message: String,
 }
@@ -61,6 +63,7 @@ impl std::fmt::Display for Error {
     }
 }
 
+#[derive(Clone)]
 pub struct ReturnValue {
     pub value: Box<Object>,
 }
@@ -71,14 +74,9 @@ impl std::fmt::Display for ReturnValue {
     }
 }
 
+#[derive(Clone)]
 pub struct Integer {
     pub value: i64,
-}
-
-impl Integer {
-    fn inspect(&self) -> String {
-        self.value.to_string()
-    }
 }
 
 impl std::fmt::Display for Integer {
@@ -135,6 +133,7 @@ impl PartialOrd for Integer {
     }
 }
 
+#[derive(Clone)]
 pub struct Boolean {
     pub value: bool,
 }
@@ -151,22 +150,11 @@ impl PartialEq for Boolean {
     }
 }
 
-impl Boolean {
-    fn inspect(&self) -> String {
-        self.value.to_string()
-    }
-}
-
+#[derive(Clone)]
 pub struct Null {}
 
 impl std::fmt::Display for Null {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "null")
-    }
-}
-
-impl Null {
-    fn inspect(&self) -> String {
-        "null".to_string()
     }
 }

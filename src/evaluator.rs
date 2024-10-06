@@ -1,22 +1,33 @@
+use std::fmt::format;
+
 use crate::ast::Expression;
+use crate::ast::Identifier;
 use crate::ast::IfExpression;
 use crate::ast::Node;
 use crate::ast::Statement;
+use crate::environment::Environment;
 use crate::object::ReturnValue;
 use crate::object::{Boolean, Integer, Object};
 
-pub fn eval(node: Node) -> Object {
+pub fn eval(node: Node, env: &mut Environment) -> Object {
     match node {
-        Node::Program(program) => eval_program(program.statements),
+        Node::Program(program) => eval_program(program.statements, env),
         Node::Statement(statement) => match statement {
+            Statement::LetStatement(let_statement) => {
+                let val = eval(Node::Expression(let_statement.value), env);
+                if val.is_error() {
+                    return val;
+                }
+                env.set(&let_statement.name.token.literal, val)
+            }
             Statement::ExpressionStatement(expression_statement) => {
-                eval(Node::Expression(expression_statement.expression))
+                eval(Node::Expression(expression_statement.expression), env)
             }
             Statement::BlockStatement(block_statement) => {
-                eval_block_statement(block_statement.statements)
+                eval_block_statement(block_statement.statements, env)
             }
             Statement::ReturnStatement(return_statement) => {
-                let value = eval(Node::Expression(return_statement.return_value));
+                let value = eval(Node::Expression(return_statement.return_value), env);
                 if value.is_error() {
                     value
                 } else {
@@ -25,7 +36,6 @@ pub fn eval(node: Node) -> Object {
                     })
                 }
             }
-            _ => panic!("not implemented"),
         },
         Node::Expression(expression) => match expression {
             Expression::IntegerLiteral(integer_literal) => Object::Integer(Integer {
@@ -33,7 +43,7 @@ pub fn eval(node: Node) -> Object {
             }),
             Expression::Boolean(boolean) => native_bool_to_boolean_object(boolean.value),
             Expression::PrefixExpression(prefix_expression) => {
-                let right = eval(Node::Expression(*prefix_expression.right));
+                let right = eval(Node::Expression(*prefix_expression.right), env);
                 if right.is_error() {
                     right
                 } else {
@@ -41,32 +51,42 @@ pub fn eval(node: Node) -> Object {
                 }
             }
             Expression::InfixExpression(infix_expression) => {
-                let left = eval(Node::Expression(*infix_expression.left));
+                let left = eval(Node::Expression(*infix_expression.left), env);
                 if left.is_error() {
                     return left;
                 }
-                let right = eval(Node::Expression(*infix_expression.right));
+                let right = eval(Node::Expression(*infix_expression.right), env);
                 if right.is_error() {
                     return right;
                 }
                 eval_infix_expression(&infix_expression.operator, left, right)
             }
-            Expression::IfExpression(if_expression) => eval_if_expression(if_expression),
+            Expression::IfExpression(if_expression) => eval_if_expression(if_expression, env),
+            Expression::Identifier(identifier) => eval_identifier(identifier, env),
             _ => panic!("not implemented"),
         },
     }
 }
 
-fn eval_if_expression(if_expression: IfExpression) -> Object {
-    let condition = eval(Node::Expression(*if_expression.condition));
+fn eval_identifier(node: Identifier, env: &mut Environment) -> Object {
+    if let Some(val) = env.get(&node.token.literal) {
+        val
+    } else {
+        Object::new_error(format!("identifier not found: {}", node.token.literal))
+    }
+}
+
+fn eval_if_expression(if_expression: IfExpression, env: &mut Environment) -> Object {
+    let condition = eval(Node::Expression(*if_expression.condition), env);
     if condition.is_error() {
         return condition;
     } else if is_truthy(condition) {
-        eval(Node::Statement(Statement::BlockStatement(
-            if_expression.consequence,
-        )))
+        eval(
+            Node::Statement(Statement::BlockStatement(if_expression.consequence)),
+            env,
+        )
     } else if let Some(alternative) = if_expression.alternative {
-        eval(Node::Statement(Statement::BlockStatement(alternative)))
+        eval(Node::Statement(Statement::BlockStatement(alternative)), env)
     } else {
         Object::new_null()
     }
@@ -171,10 +191,10 @@ fn eval_bang_operator_expression(right: Object) -> Object {
     }
 }
 
-fn eval_program(statements: Vec<Statement>) -> Object {
+fn eval_program(statements: Vec<Statement>, env: &mut Environment) -> Object {
     let mut result = Object::new_null();
     for statement in statements {
-        result = eval(Node::Statement(statement));
+        result = eval(Node::Statement(statement), env);
         match result {
             Object::ReturnValue(return_value) => {
                 return *return_value.value;
@@ -188,10 +208,10 @@ fn eval_program(statements: Vec<Statement>) -> Object {
     result
 }
 
-fn eval_block_statement(statements: Vec<Statement>) -> Object {
+fn eval_block_statement(statements: Vec<Statement>, env: &mut Environment) -> Object {
     let mut result = Object::new_null();
     for statement in statements {
-        result = eval(Node::Statement(statement));
+        result = eval(Node::Statement(statement), env);
         match result {
             Object::ReturnValue(_) => {
                 return result;
@@ -208,7 +228,9 @@ fn eval_block_statement(statements: Vec<Statement>) -> Object {
 #[cfg(test)]
 mod tests {
     use super::eval;
-    use crate::{ast::Node, lexer::Lexer, object::Object, parser::Parser};
+    use crate::{
+        ast::Node, environment::Environment, lexer::Lexer, object::Object, parser::Parser,
+    };
 
     #[test]
     fn test_eval_integer_expression() {
@@ -337,6 +359,7 @@ mod tests {
                 "if (10 > 1) { if (10 > 1) { return true + false; } return 1; }",
                 "unknown operator: Boolean + Boolean",
             ),
+            ("foobar", "identifier not found: foobar"),
         ];
         for test in tests {
             let (input, expected) = test;
@@ -349,10 +372,25 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_let_statements() {
+        let tests: Vec<(&'static str, i64)> = vec![
+            ("let a = 5; a;", 5),
+            ("let a = 5 * 5; a;", 25),
+            ("let a = 5; let b = a; b;", 5),
+            ("let a = 5; let b = a; let c = a + b + 5; c;", 15),
+        ];
+        for test in tests {
+            let (input, expected) = test;
+            test_integer_object(test_eval(input), expected);
+        }
+    }
+
     fn test_eval(input: &str) -> Object {
         let mut parser = Parser::new(Lexer::new(input));
         let program = parser.parse_program().expect("to parse program");
-        eval(Node::Program(program))
+        let mut env = Environment::new();
+        eval(Node::Program(program), &mut env)
     }
 
     fn test_integer_object(obj: Object, expected: i64) {

@@ -1,4 +1,5 @@
 use crate::ast::Node;
+use crate::environment::Environment;
 use crate::parser::Parser;
 use crate::{evaluator, lexer::Lexer};
 use std::io::{self, Write};
@@ -6,6 +7,7 @@ use std::io::{self, Write};
 const PROMPT: &str = ">> ";
 
 pub fn start() -> io::Result<usize> {
+    let mut env = Environment::new();
     loop {
         print_prompt();
         let mut input = String::new();
@@ -17,7 +19,7 @@ pub fn start() -> io::Result<usize> {
             parser.print_errors();
             continue;
         }
-        let evaluated = evaluator::eval(Node::Program(program));
+        let evaluated = evaluator::eval(Node::Program(program), &mut env);
         println!("{evaluated}");
     }
 }
