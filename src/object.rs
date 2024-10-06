@@ -5,6 +5,7 @@ pub enum Object {
     Boolean(Boolean),
     Null(Null),
     ReturnValue(ReturnValue),
+    Error(Error),
 }
 
 impl Object {
@@ -17,6 +18,24 @@ impl Object {
     pub fn new_null() -> Self {
         Object::Null(Null {})
     }
+    pub fn new_error(message: String) -> Self {
+        Object::Error(Error { message })
+    }
+    pub fn get_type(&self) -> String {
+        match *self {
+            Object::Integer(_) => "Integer".to_string(),
+            Object::Boolean(_) => "Boolean".to_string(),
+            Object::Null(_) => "Null".to_string(),
+            Object::ReturnValue(_) => "ReturnValue".to_string(),
+            Object::Error(_) => "Error".to_string(),
+        }
+    }
+    pub fn is_error(&self) -> bool {
+        match *self {
+            Object::Error(_) => true,
+            _ => false,
+        }
+    }
 }
 
 impl std::fmt::Display for Object {
@@ -26,8 +45,19 @@ impl std::fmt::Display for Object {
             Object::Boolean(boolean) => boolean.to_string(),
             Object::Null(null) => null.to_string(),
             Object::ReturnValue(return_value) => return_value.to_string(),
+            Object::Error(error) => error.to_string(),
         };
         write!(f, "{content}")
+    }
+}
+
+pub struct Error {
+    pub message: String,
+}
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ERROR: {}", self.message)
     }
 }
 
@@ -57,7 +87,7 @@ impl std::fmt::Display for Integer {
     }
 }
 
-impl Add for Integer {
+impl Add for &Integer {
     type Output = Integer;
     fn add(self, rhs: Self) -> Self::Output {
         Integer {
@@ -66,7 +96,7 @@ impl Add for Integer {
     }
 }
 
-impl Sub for Integer {
+impl Sub for &Integer {
     type Output = Integer;
     fn sub(self, rhs: Self) -> Self::Output {
         Integer {
@@ -75,7 +105,7 @@ impl Sub for Integer {
     }
 }
 
-impl Mul for Integer {
+impl Mul for &Integer {
     type Output = Integer;
     fn mul(self, rhs: Self) -> Self::Output {
         Integer {
@@ -84,7 +114,7 @@ impl Mul for Integer {
     }
 }
 
-impl Div for Integer {
+impl Div for &Integer {
     type Output = Integer;
     fn div(self, rhs: Self) -> Self::Output {
         Integer {

@@ -17,9 +17,13 @@ pub fn eval(node: Node) -> Object {
             }
             Statement::ReturnStatement(return_statement) => {
                 let value = eval(Node::Expression(return_statement.return_value));
-                Object::ReturnValue(ReturnValue {
-                    value: Box::new(value),
-                })
+                if value.is_error() {
+                    value
+                } else {
+                    Object::ReturnValue(ReturnValue {
+                        value: Box::new(value),
+                    })
+                }
             }
             _ => panic!("not implemented"),
         },
@@ -30,11 +34,21 @@ pub fn eval(node: Node) -> Object {
             Expression::Boolean(boolean) => native_bool_to_boolean_object(boolean.value),
             Expression::PrefixExpression(prefix_expression) => {
                 let right = eval(Node::Expression(*prefix_expression.right));
-                eval_prefix_expression(&prefix_expression.operator, right)
+                if right.is_error() {
+                    right
+                } else {
+                    eval_prefix_expression(&prefix_expression.operator, right)
+                }
             }
             Expression::InfixExpression(infix_expression) => {
                 let left = eval(Node::Expression(*infix_expression.left));
+                if left.is_error() {
+                    return left;
+                }
                 let right = eval(Node::Expression(*infix_expression.right));
+                if right.is_error() {
+                    return right;
+                }
                 eval_infix_expression(&infix_expression.operator, left, right)
             }
             Expression::IfExpression(if_expression) => eval_if_expression(if_expression),
@@ -45,7 +59,9 @@ pub fn eval(node: Node) -> Object {
 
 fn eval_if_expression(if_expression: IfExpression) -> Object {
     let condition = eval(Node::Expression(*if_expression.condition));
-    if is_truthy(condition) {
+    if condition.is_error() {
+        return condition;
+    } else if is_truthy(condition) {
         eval(Node::Statement(Statement::BlockStatement(
             if_expression.consequence,
         )))
@@ -68,32 +84,55 @@ fn eval_prefix_expression(operator: &str, right: Object) -> Object {
     match operator {
         "!" => eval_bang_operator_expression(right),
         "-" => eval_minus_prefix_operator_expression(right),
-        _ => Object::new_null(),
+        _ => Object::new_error(format!(
+            "unknown operator: {}{}",
+            operator,
+            right.get_type()
+        )),
     }
 }
 
 fn eval_infix_expression(operator: &str, left: Object, right: Object) -> Object {
-    if let Object::Integer(left) = left {
-        if let Object::Integer(right) = right {
-            return eval_integer_infix_expression(operator, left, right);
+    if let Object::Integer(left_integer) = &left {
+        if let Object::Integer(right_integer) = &right {
+            return eval_integer_infix_expression(operator, left_integer, right_integer);
+        } else {
+            return Object::new_error(format!(
+                "type mismatch: {} {} {}",
+                left.get_type(),
+                operator,
+                right.get_type()
+            ));
         }
-    } else if let Object::Boolean(left) = left {
-        if let Object::Boolean(right) = right {
-            return eval_boolean_infix_expression(operator, left, right);
+    } else if let Object::Boolean(left_boolean) = &left {
+        if let Object::Boolean(right_boolean) = &right {
+            return eval_boolean_infix_expression(operator, left_boolean, right_boolean);
+        } else {
+            return Object::new_error(format!(
+                "type mismatch: {} {} {}",
+                left.get_type(),
+                operator,
+                right.get_type()
+            ));
         }
     }
-    Object::new_null()
+    Object::new_error(format!(
+        "type mismatch: {} {} {}",
+        left.get_type(),
+        operator,
+        right.get_type()
+    ))
 }
 
-fn eval_boolean_infix_expression(operator: &str, left: Boolean, right: Boolean) -> Object {
+fn eval_boolean_infix_expression(operator: &str, left: &Boolean, right: &Boolean) -> Object {
     match operator {
         "==" => native_bool_to_boolean_object(left == right),
         "!=" => native_bool_to_boolean_object(left != right),
-        _ => Object::new_null(),
+        _ => Object::new_error(format!("unknown operator: Boolean {operator} Boolean")),
     }
 }
 
-fn eval_integer_infix_expression(operator: &str, left: Integer, right: Integer) -> Object {
+fn eval_integer_infix_expression(operator: &str, left: &Integer, right: &Integer) -> Object {
     match operator {
         "+" => Object::Integer(left + right),
         "-" => Object::Integer(left - right),
@@ -103,7 +142,7 @@ fn eval_integer_infix_expression(operator: &str, left: Integer, right: Integer) 
         ">" => native_bool_to_boolean_object(left > right),
         "==" => native_bool_to_boolean_object(left == right),
         "!=" => native_bool_to_boolean_object(left != right),
-        _ => Object::new_null(),
+        _ => Object::new_error(format!("unknown operator: Integer {operator} Integer")),
     }
 }
 
@@ -120,7 +159,7 @@ fn eval_minus_prefix_operator_expression(right: Object) -> Object {
         Object::Integer(integer) => Object::Integer(Integer {
             value: integer.value * -1,
         }),
-        _ => Object::new_null(),
+        _ => Object::new_error(format!("unknown operator: -{}", right.get_type())),
     }
 }
 
@@ -136,8 +175,14 @@ fn eval_program(statements: Vec<Statement>) -> Object {
     let mut result = Object::new_null();
     for statement in statements {
         result = eval(Node::Statement(statement));
-        if let Object::ReturnValue(return_value) = result {
-            return *return_value.value;
+        match result {
+            Object::ReturnValue(return_value) => {
+                return *return_value.value;
+            }
+            Object::Error(_) => {
+                return result;
+            }
+            _ => {}
         }
     }
     result
@@ -147,8 +192,14 @@ fn eval_block_statement(statements: Vec<Statement>) -> Object {
     let mut result = Object::new_null();
     for statement in statements {
         result = eval(Node::Statement(statement));
-        if let Object::ReturnValue(_) = result {
-            return result;
+        match result {
+            Object::ReturnValue(_) => {
+                return result;
+            }
+            Object::Error(_) => {
+                return result;
+            }
+            _ => {}
         }
     }
     result
@@ -267,6 +318,34 @@ mod tests {
             let (input, expected) = test;
             let evaluated = test_eval(input);
             test_integer_object(evaluated, expected);
+        }
+    }
+
+    #[test]
+    fn test_error_handling() {
+        let tests: Vec<(&'static str, &'static str)> = vec![
+            ("5 + true;", "type mismatch: Integer + Boolean"),
+            ("5 + true; 5;", "type mismatch: Integer + Boolean"),
+            ("-true", "unknown operator: -Boolean"),
+            ("true + false;", "unknown operator: Boolean + Boolean"),
+            ("5; true + false; 5", "unknown operator: Boolean + Boolean"),
+            (
+                "if (10 > 1) { true + false; }",
+                "unknown operator: Boolean + Boolean",
+            ),
+            (
+                "if (10 > 1) { if (10 > 1) { return true + false; } return 1; }",
+                "unknown operator: Boolean + Boolean",
+            ),
+        ];
+        for test in tests {
+            let (input, expected) = test;
+            let evaluated = test_eval(input);
+            if let Object::Error(error) = evaluated {
+                assert_eq!(expected, error.message);
+            } else {
+                panic!("no error object");
+            }
         }
     }
 
