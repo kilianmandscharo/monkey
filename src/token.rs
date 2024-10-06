@@ -65,13 +65,6 @@ impl Token {
     pub fn from_string(t: TokenType, literal: String) -> Self {
         Self { t, literal }
     }
-
-    pub fn from_str(t: TokenType, literal: &str) -> Self {
-        Self {
-            t,
-            literal: literal.to_string(),
-        }
-    }
 }
 
 pub fn lookup_ident(ident: &str) -> TokenType {

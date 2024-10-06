@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::token::Token;
 
 #[derive(Debug, Clone)]
@@ -50,6 +48,7 @@ impl std::fmt::Display for Program {
     }
 }
 
+#[derive(Clone)]
 pub enum Statement {
     LetStatement(LetStatement),
     ReturnStatement(ReturnStatement),
@@ -71,6 +70,7 @@ impl std::fmt::Display for Statement {
     }
 }
 
+#[derive(Clone)]
 pub struct LetStatement {
     pub token: Token,
     pub name: Identifier,
@@ -89,6 +89,7 @@ impl std::fmt::Display for LetStatement {
     }
 }
 
+#[derive(Clone)]
 pub struct ReturnStatement {
     pub token: Token,
     pub return_value: Expression,
@@ -105,6 +106,7 @@ impl std::fmt::Display for ReturnStatement {
     }
 }
 
+#[derive(Clone)]
 pub struct ExpressionStatement {
     pub token: Token,
     pub expression: Expression,
@@ -116,6 +118,7 @@ impl std::fmt::Display for ExpressionStatement {
     }
 }
 
+#[derive(Clone)]
 pub struct BlockStatement {
     pub token: Token,
     pub statements: Vec<Statement>,
@@ -146,6 +149,7 @@ impl std::fmt::Display for Identifier {
     }
 }
 
+#[derive(Clone)]
 pub struct IntegerLiteral {
     pub token: Token,
     pub value: i64,
@@ -157,6 +161,7 @@ impl std::fmt::Display for IntegerLiteral {
     }
 }
 
+#[derive(Clone)]
 pub struct PrefixExpression {
     pub token: Token,
     pub operator: String,
@@ -169,6 +174,7 @@ impl std::fmt::Display for PrefixExpression {
     }
 }
 
+#[derive(Clone)]
 pub struct InfixExpression {
     pub token: Token,
     pub left: Box<Expression>,
@@ -188,6 +194,7 @@ impl std::fmt::Display for InfixExpression {
     }
 }
 
+#[derive(Clone)]
 pub struct Boolean {
     pub token: Token,
     pub value: bool,
@@ -199,6 +206,7 @@ impl std::fmt::Display for Boolean {
     }
 }
 
+#[derive(Clone)]
 pub struct IfExpression {
     pub token: Token,
     pub condition: Box<Expression>,
@@ -226,6 +234,7 @@ impl std::fmt::Display for IfExpression {
     }
 }
 
+#[derive(Clone)]
 pub struct FunctionLiteral {
     pub token: Token,
     pub parameters: Vec<Identifier>,
@@ -248,6 +257,7 @@ impl std::fmt::Display for FunctionLiteral {
     }
 }
 
+#[derive(Clone)]
 pub struct CallExpression {
     pub token: Token,
     pub function: Box<Expression>,
@@ -269,6 +279,7 @@ impl std::fmt::Display for CallExpression {
     }
 }
 
+#[derive(Clone)]
 pub enum Expression {
     Empty(),
     Identifier(Identifier),
@@ -308,12 +319,12 @@ mod tests {
     fn test_string() {
         let program = Program {
             statements: vec![Statement::LetStatement(LetStatement {
-                token: Token::from_str(TokenType::Let, "let"),
+                token: Token::from_string(TokenType::Let, "let".to_string()),
                 name: Identifier {
-                    token: Token::from_str(TokenType::Ident, "myVar"),
+                    token: Token::from_string(TokenType::Ident, "myVar".to_string()),
                 },
                 value: Expression::Identifier(Identifier {
-                    token: Token::from_str(TokenType::Ident, "anotherVar"),
+                    token: Token::from_string(TokenType::Ident, "anotherVar".to_string()),
                 }),
             })],
         };

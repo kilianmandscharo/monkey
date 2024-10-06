@@ -1,5 +1,10 @@
 use std::ops::{Add, Div, Mul, Sub};
 
+use crate::{
+    ast::{BlockStatement, Identifier},
+    environment::Environment,
+};
+
 #[derive(Clone)]
 pub enum Object {
     Integer(Integer),
@@ -7,6 +12,7 @@ pub enum Object {
     Null(Null),
     ReturnValue(ReturnValue),
     Error(Error),
+    Function(Function),
 }
 
 impl Object {
@@ -29,6 +35,7 @@ impl Object {
             Object::Null(_) => "Null".to_string(),
             Object::ReturnValue(_) => "ReturnValue".to_string(),
             Object::Error(_) => "Error".to_string(),
+            Object::Function(_) => "Function".to_string(),
         }
     }
     pub fn is_error(&self) -> bool {
@@ -47,8 +54,31 @@ impl std::fmt::Display for Object {
             Object::Null(null) => null.to_string(),
             Object::ReturnValue(return_value) => return_value.to_string(),
             Object::Error(error) => error.to_string(),
+            Object::Function(function) => function.to_string(),
         };
         write!(f, "{content}")
+    }
+}
+
+#[derive(Clone)]
+pub struct Function {
+    pub parameters: Vec<Identifier>,
+    pub body: BlockStatement,
+    pub env: Environment,
+}
+
+impl std::fmt::Display for Function {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "fn({}) {{\n{}\n}}",
+            self.parameters
+                .iter()
+                .map(|param| param.to_string())
+                .collect::<Vec<String>>()
+                .join(", "),
+            self.body.to_string()
+        )
     }
 }
 

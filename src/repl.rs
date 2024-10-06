@@ -7,7 +7,7 @@ use std::io::{self, Write};
 const PROMPT: &str = ">> ";
 
 pub fn start() -> io::Result<usize> {
-    let mut env = Environment::new();
+    let env = Environment::new();
     loop {
         print_prompt();
         let mut input = String::new();
@@ -19,7 +19,7 @@ pub fn start() -> io::Result<usize> {
             parser.print_errors();
             continue;
         }
-        let evaluated = evaluator::eval(Node::Program(program), &mut env);
+        let evaluated = evaluator::eval(Node::Program(program), env.clone());
         println!("{evaluated}");
     }
 }
