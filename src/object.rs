@@ -14,6 +14,7 @@ pub enum Object {
     Error(Error),
     Function(Function),
     StringObj(StringObj),
+    Builtin(Builtin),
 }
 
 impl Object {
@@ -38,6 +39,7 @@ impl Object {
             Object::Error(_) => "Error".to_string(),
             Object::Function(_) => "Function".to_string(),
             Object::StringObj(_) => "String".to_string(),
+            Object::Builtin(_) => "Builtin".to_string(),
         }
     }
     pub fn is_error(&self) -> bool {
@@ -58,6 +60,7 @@ impl std::fmt::Display for Object {
             Object::Error(error) => error.to_string(),
             Object::Function(function) => function.to_string(),
             Object::StringObj(string_obj) => string_obj.to_string(),
+            Object::Builtin(builtin) => builtin.to_string(),
         };
         write!(f, "{content}")
     }
@@ -82,6 +85,19 @@ impl std::fmt::Display for Function {
                 .join(", "),
             self.body.to_string()
         )
+    }
+}
+
+pub type BuiltinFunction = fn(arg: Vec<Object>) -> Object;
+
+#[derive(Clone)]
+pub struct Builtin {
+    pub func: BuiltinFunction,
+}
+
+impl std::fmt::Display for Builtin {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "builtin function")
     }
 }
 

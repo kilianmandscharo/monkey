@@ -1,7 +1,8 @@
 use crate::ast::Node;
 use crate::environment::Environment;
+use crate::evaluator::Evaluator;
+use crate::lexer::Lexer;
 use crate::parser::Parser;
-use crate::{evaluator, lexer::Lexer};
 use std::io::{self, Write};
 
 const PROMPT: &str = ">> ";
@@ -19,7 +20,8 @@ pub fn start() -> io::Result<usize> {
             parser.print_errors();
             continue;
         }
-        let evaluated = evaluator::eval(Node::Program(program), env.clone());
+        let evaluator = Evaluator::new();
+        let evaluated = evaluator.eval(Node::Program(program), env.clone());
         println!("{evaluated}");
     }
 }
