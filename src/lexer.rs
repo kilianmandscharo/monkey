@@ -47,6 +47,7 @@ impl Lexer {
             '>' => Token::new(TokenType::GT, self.ch),
             '!' => self.match_bang(),
             '=' => self.match_equal(),
+            '"' => self.read_string(),
             '\0' => Token::new(TokenType::Eof, self.ch),
             ch => return self.match_char(ch),
         };
@@ -54,6 +55,20 @@ impl Lexer {
         self.read_char();
 
         tok
+    }
+
+    fn read_string(&mut self) -> Token {
+        let position = self.position + 1;
+        loop {
+            self.read_char();
+            if self.ch == '"' || self.ch == '\0' {
+                break;
+            }
+        }
+        Token::from_string(
+            TokenType::String,
+            self.input[position..self.position].into_iter().collect(),
+        )
     }
 
     fn match_equal(&mut self) -> Token {
@@ -154,6 +169,9 @@ mod tests {
 
             10 == 10;
             10 != 9;
+
+            "foobar";
+            "foo bar";
         "#;
         let tests: Vec<Test> = vec![
             (TokenType::Let, "let"),
@@ -228,6 +246,10 @@ mod tests {
             (TokenType::Int, "10"),
             (TokenType::NotEq, "!="),
             (TokenType::Int, "9"),
+            (TokenType::Semicolon, ";"),
+            (TokenType::String, "foobar"),
+            (TokenType::Semicolon, ";"),
+            (TokenType::String, "foo bar"),
             (TokenType::Semicolon, ";"),
             (TokenType::Eof, "\0"),
         ];

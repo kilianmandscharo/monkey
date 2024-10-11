@@ -4,7 +4,7 @@ use crate::{
     ast::{
         BlockStatement, Boolean, CallExpression, Expression, ExpressionStatement, FunctionLiteral,
         Identifier, IfExpression, InfixExpression, IntegerLiteral, LetStatement, ParsingError,
-        PrefixExpression, Program, Result, ReturnStatement, Statement,
+        PrefixExpression, Program, Result, ReturnStatement, Statement, StringLiteral,
     },
     lexer::Lexer,
     token::{Token, TokenType},
@@ -83,6 +83,7 @@ impl Parser {
         parser.register_prefix(TokenType::LParen, Parser::parse_grouped_expression);
         parser.register_prefix(TokenType::If, Parser::parse_if_expression);
         parser.register_prefix(TokenType::Function, Parser::parse_function_literal);
+        parser.register_prefix(TokenType::String, Parser::parse_string_literal);
 
         parser.register_infix(TokenType::Plus, Parser::parse_infix_expression);
         parser.register_infix(TokenType::Minus, Parser::parse_infix_expression);
@@ -176,6 +177,12 @@ impl Parser {
 
     fn parse_identifier(&mut self) -> Result<Expression> {
         Ok(Expression::Identifier(Identifier {
+            token: mem::take(&mut self.cur_token),
+        }))
+    }
+
+    fn parse_string_literal(&mut self) -> Result<Expression> {
+        Ok(Expression::StringLiteral(StringLiteral {
             token: mem::take(&mut self.cur_token),
         }))
     }
@@ -797,10 +804,6 @@ mod tests {
         let alternative = match &if_expression.alternative {
             Some(alternative) => alternative,
             None => panic!("no alternative found"),
-            //Statement::ExpressionStatement(ref expression_statement) => {
-            //    test_identifier(&expression_statement.expression, "x");
-            //}
-            //_ => panic!("not an expression statement"),
         };
         assert_eq!(1, alternative.statements.len());
 
@@ -971,6 +974,31 @@ mod tests {
                 assert_eq!(arg, call_expression.arguments[i].to_string());
             }
         }
+    }
+
+    #[test]
+    fn test_string_literal_expression() {
+        let input = "\"hello world\"";
+
+        let lexer = lexer::Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program().expect("program to parse");
+
+        check_parser_errors(&parser);
+
+        assert_eq!(1, program.statements.len());
+
+        let expression = match &program.statements[0] {
+            Statement::ExpressionStatement(stmt) => &stmt.expression,
+            _ => panic!("not an expression statement"),
+        };
+
+        let string_literal = match expression {
+            Expression::StringLiteral(string_literal) => string_literal,
+            _ => panic!("not a call expression"),
+        };
+
+        assert_eq!("hello world", string_literal.token.literal);
     }
 
     fn test_integer_literal(integer_literal: &Expression, value: i64) {

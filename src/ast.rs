@@ -207,6 +207,17 @@ impl std::fmt::Display for Boolean {
 }
 
 #[derive(Clone)]
+pub struct StringLiteral {
+    pub token: Token,
+}
+
+impl std::fmt::Display for StringLiteral {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.token.literal)
+    }
+}
+
+#[derive(Clone)]
 pub struct IfExpression {
     pub token: Token,
     pub condition: Box<Expression>,
@@ -290,6 +301,7 @@ pub enum Expression {
     IfExpression(IfExpression),
     FunctionLiteral(FunctionLiteral),
     CallExpression(CallExpression),
+    StringLiteral(StringLiteral),
 }
 
 impl std::fmt::Display for Expression {
@@ -304,6 +316,7 @@ impl std::fmt::Display for Expression {
             Expression::IfExpression(if_expression) => if_expression.to_string(),
             Expression::FunctionLiteral(function_literal) => function_literal.to_string(),
             Expression::CallExpression(call_expression) => call_expression.to_string(),
+            Expression::StringLiteral(string_literal) => string_literal.to_string(),
         };
         write!(f, "{}", content)
     }

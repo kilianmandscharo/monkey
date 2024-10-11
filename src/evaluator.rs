@@ -1,6 +1,6 @@
 use crate::ast::{Expression, Identifier, IfExpression, Node, Statement};
 use crate::environment::Environment;
-use crate::object::{Boolean, Function, Integer, Object, ReturnValue};
+use crate::object::{Boolean, Function, Integer, Object, ReturnValue, StringObj};
 
 pub fn eval(node: Node, env: Environment) -> Object {
     match node {
@@ -73,6 +73,9 @@ pub fn eval(node: Node, env: Environment) -> Object {
                     apply_function(func, args)
                 }
             }
+            Expression::StringLiteral(string_literal) => Object::StringObj(StringObj {
+                value: string_literal.token.literal,
+            }),
             Expression::Empty() => panic!("you should not be here"),
         },
     }
@@ -194,6 +197,17 @@ fn eval_infix_expression(operator: &str, left: Object, right: Object) -> Object 
                 right.get_type()
             ));
         }
+    } else if let Object::StringObj(left_string_obj) = &left {
+        if let Object::StringObj(right_string_obj) = &right {
+            return eval_string_infix_expression(operator, left_string_obj, right_string_obj);
+        } else {
+            return Object::new_error(format!(
+                "type mismatch: {} {} {}",
+                left.get_type(),
+                operator,
+                right.get_type()
+            ));
+        }
     }
     Object::new_error(format!(
         "type mismatch: {} {} {}",
@@ -201,6 +215,16 @@ fn eval_infix_expression(operator: &str, left: Object, right: Object) -> Object 
         operator,
         right.get_type()
     ))
+}
+
+fn eval_string_infix_expression(operator: &str, left: &StringObj, right: &StringObj) -> Object {
+    if operator != "+" {
+        Object::new_error(format!("unknown operator: String {operator} String"))
+    } else {
+        Object::StringObj(StringObj {
+            value: format!("{}{}", left.value, right.value),
+        })
+    }
 }
 
 fn eval_boolean_infix_expression(operator: &str, left: &Boolean, right: &Boolean) -> Object {
@@ -424,6 +448,7 @@ mod tests {
                 "unknown operator: Boolean + Boolean",
             ),
             ("foobar", "identifier not found: foobar"),
+            ("\"Hello\" - \"World\"", "unknown operator: String - String"),
         ];
         for test in tests {
             let (input, expected) = test;
@@ -484,6 +509,28 @@ mod tests {
         let input =
             "let a = 1; let newAdder = fn(x) { fn(y) { x + y + a }; }; let addTwo = newAdder(2); addTwo(2);";
         test_integer_object(test_eval(input), 5);
+    }
+
+    #[test]
+    fn test_string_literal() {
+        let input = "\"Hello World!\"";
+        let evaluated = test_eval(input);
+        let string_obj = match evaluated {
+            Object::StringObj(string_obj) => string_obj,
+            _ => panic!("not a string_obj"),
+        };
+        assert_eq!("Hello World!", string_obj.value)
+    }
+
+    #[test]
+    fn test_string_concatenation() {
+        let input = "\"Hello\" + \" \" + \"World!\"";
+        let evaluated = test_eval(input);
+        let string_obj = match evaluated {
+            Object::StringObj(string_obj) => string_obj,
+            _ => panic!("not a string_obj"),
+        };
+        assert_eq!("Hello World!", string_obj.value)
     }
 
     fn test_eval(input: &str) -> Object {

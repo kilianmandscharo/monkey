@@ -13,6 +13,7 @@ pub enum Object {
     ReturnValue(ReturnValue),
     Error(Error),
     Function(Function),
+    StringObj(StringObj),
 }
 
 impl Object {
@@ -36,6 +37,7 @@ impl Object {
             Object::ReturnValue(_) => "ReturnValue".to_string(),
             Object::Error(_) => "Error".to_string(),
             Object::Function(_) => "Function".to_string(),
+            Object::StringObj(_) => "String".to_string(),
         }
     }
     pub fn is_error(&self) -> bool {
@@ -55,6 +57,7 @@ impl std::fmt::Display for Object {
             Object::ReturnValue(return_value) => return_value.to_string(),
             Object::Error(error) => error.to_string(),
             Object::Function(function) => function.to_string(),
+            Object::StringObj(string_obj) => string_obj.to_string(),
         };
         write!(f, "{content}")
     }
@@ -79,6 +82,17 @@ impl std::fmt::Display for Function {
                 .join(", "),
             self.body.to_string()
         )
+    }
+}
+
+#[derive(Clone)]
+pub struct StringObj {
+    pub value: String,
+}
+
+impl std::fmt::Display for StringObj {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.value)
     }
 }
 
