@@ -21,8 +21,7 @@ pub fn start() -> io::Result<usize> {
             continue;
         }
         let evaluator = Evaluator::new();
-        let evaluated = evaluator.eval(Node::Program(program), env.clone());
-        println!("{evaluated}");
+        evaluator.eval(Node::Program(program), env.clone());
     }
 }
 

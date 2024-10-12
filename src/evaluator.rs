@@ -149,6 +149,17 @@ impl Evaluator {
                 },
             },
         );
+        self.builtins.insert(
+            "print",
+            Builtin {
+                func: |args| {
+                    for arg in args.iter() {
+                        println!("{arg}");
+                    }
+                    Object::new_null()
+                },
+            },
+        );
     }
 
     fn eval_identifier(&self, node: Identifier, env: Environment) -> Object {
