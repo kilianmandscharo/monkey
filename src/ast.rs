@@ -1,5 +1,4 @@
 use crate::token::Token;
-use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct ParsingError {
@@ -333,7 +332,7 @@ impl std::fmt::Display for IndexExpression {
 #[derive(Clone)]
 pub struct MapLiteral {
     pub token: Token,
-    pub pairs: HashMap<HashableExpression, Expression>,
+    pub pairs: Vec<(Expression, Expression)>,
 }
 
 impl std::fmt::Display for MapLiteral {
@@ -347,40 +346,6 @@ impl std::fmt::Display for MapLiteral {
                 .collect::<Vec<_>>()
                 .join(",")
         )
-    }
-}
-
-#[derive(Clone, PartialEq, Hash)]
-pub enum HashableExpression {
-    IntegerLiteral(IntegerLiteral),
-    StringLiteral(StringLiteral),
-    Boolean(Boolean),
-}
-
-impl HashableExpression {
-    pub fn to_expression(self) -> Expression {
-        match self {
-            HashableExpression::Boolean(boolean) => Expression::Boolean(boolean),
-            HashableExpression::StringLiteral(string_literal) => {
-                Expression::StringLiteral(string_literal)
-            }
-            HashableExpression::IntegerLiteral(integer_literal) => {
-                Expression::IntegerLiteral(integer_literal)
-            }
-        }
-    }
-}
-
-impl Eq for HashableExpression {}
-
-impl std::fmt::Display for HashableExpression {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let content = match self {
-            HashableExpression::IntegerLiteral(integer_literal) => integer_literal.to_string(),
-            HashableExpression::Boolean(boolean) => boolean.to_string(),
-            HashableExpression::StringLiteral(string_literal) => string_literal.to_string(),
-        };
-        write!(f, "{}", content)
     }
 }
 
@@ -399,26 +364,6 @@ pub enum Expression {
     ArrayLiteral(ArrayLiteral),
     IndexExpression(IndexExpression),
     MapLiteral(MapLiteral),
-}
-
-impl Expression {
-    pub fn to_hashable_expression(self) -> Result<HashableExpression> {
-        match self {
-            Expression::StringLiteral(string_literal) => {
-                Ok(HashableExpression::StringLiteral(string_literal))
-            }
-            Expression::Boolean(boolean) => Ok(HashableExpression::Boolean(boolean)),
-            Expression::IntegerLiteral(integer_literal) => {
-                Ok(HashableExpression::IntegerLiteral(integer_literal))
-            }
-            _ => Err(ParsingError {
-                message: format!(
-                    "can't transform to HashableExpression: {}",
-                    self.to_string()
-                ),
-            }),
-        }
-    }
 }
 
 impl std::fmt::Display for Expression {

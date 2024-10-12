@@ -275,9 +275,9 @@ impl Evaluator {
 
     fn eval_map_literal(&self, map: MapLiteral, env: Environment) -> Object {
         let mut pairs = HashMap::new();
-        for (key_node, value_node) in map.pairs.into_iter() {
+        for (key_node, value_node) in map.pairs {
             let key = self
-                .eval(Node::Expression(key_node.to_expression()), env.clone())
+                .eval(Node::Expression(key_node), env.clone())
                 .to_hashable_object();
             let value = self.eval(Node::Expression(value_node), env.clone());
             if value.is_error() {
@@ -930,8 +930,11 @@ mod tests {
     #[test]
     fn test_map_literals() {
         let input = r#"
+            let two = "two";
             {
                 "one": 10 - 9,
+                two: 2,
+                "thr" + "ee": 3,
                 4: 4,
                 true: 5,
                 false: 6
@@ -949,6 +952,18 @@ mod tests {
                     value: "one".to_string(),
                 }),
                 1,
+            ),
+            (
+                HashableObject::StringObj(StringObj {
+                    value: "two".to_string(),
+                }),
+                2,
+            ),
+            (
+                HashableObject::StringObj(StringObj {
+                    value: "three".to_string(),
+                }),
+                3,
             ),
             (HashableObject::Integer(Integer { value: 4 }), 4),
             (HashableObject::Boolean(Boolean { value: true }), 5),

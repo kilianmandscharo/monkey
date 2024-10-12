@@ -203,15 +203,14 @@ impl Parser {
 
     fn parse_map_literal(&mut self) -> Result<Expression> {
         let token = mem::take(&mut self.cur_token);
-        let mut pairs = HashMap::new();
+        let mut pairs = Vec::new();
         while !self.peek_token_is(TokenType::RBrace) {
             self.next_token();
             let key = self.parse_expression(Precedence::Lowest)?;
-            let key = key.to_hashable_expression()?;
             self.expect_peek(TokenType::Colon)?;
             self.next_token();
             let value = self.parse_expression(Precedence::Lowest)?;
-            pairs.insert(key, value);
+            pairs.push((key, value));
             if !self.peek_token_is(TokenType::RBrace) {
                 self.expect_peek(TokenType::Comma)?;
             }
@@ -505,12 +504,10 @@ impl Parser {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::lexer;
     use core::panic;
     use std::any::Any;
-
-    use crate::{ast::HashableExpression, lexer};
-
-    use super::*;
 
     #[test]
     fn test_let_statements() {
@@ -1132,16 +1129,16 @@ mod tests {
             ("one".to_string(), 1),
             ("two".to_string(), 2),
             ("three".to_string(), 3),
-        ]
-        .into_iter()
-        .collect::<HashMap<String, i64>>();
+        ];
 
-        for (key, value) in map_literal.pairs.iter() {
-            let key_value = match key {
-                HashableExpression::StringLiteral(string_literal) => &string_literal.token.literal,
-                _ => panic!("not a string literal"),
+        for (i, (key, value)) in map_literal.pairs.iter().enumerate() {
+            match key {
+                Expression::StringLiteral(string_literal) => {
+                    assert_eq!(expected[i].0, string_literal.token.literal);
+                }
+                _ => panic!("not a  string literal"),
             };
-            test_integer_literal(value, *expected.get(key_value).unwrap());
+            test_integer_literal(value, expected[i].1);
         }
     }
 
@@ -1192,28 +1189,31 @@ mod tests {
             _ => panic!("not an index expression"),
         };
 
-        let mut expected: HashMap<String, Box<dyn Fn(&Expression)>> = HashMap::new();
-        expected.insert(
-            "one".to_string(),
-            Box::new(|exp| test_infix_expression(exp, &0, "+", &1)),
-        );
-        expected.insert(
-            "two".to_string(),
-            Box::new(|exp| test_infix_expression(exp, &10, "-", &8)),
-        );
-        expected.insert(
-            "three".to_string(),
-            Box::new(|exp| test_infix_expression(exp, &15, "/", &5)),
-        );
+        let expected: Vec<(String, Box<dyn Fn(&Expression)>)> = vec![
+            (
+                "one".to_string(),
+                Box::new(|exp| test_infix_expression(exp, &0, "+", &1)),
+            ),
+            (
+                "two".to_string(),
+                Box::new(|exp| test_infix_expression(exp, &10, "-", &8)),
+            ),
+            (
+                "three".to_string(),
+                Box::new(|exp| test_infix_expression(exp, &15, "/", &5)),
+            ),
+        ];
 
         assert_eq!(3, map_literal.pairs.len());
 
-        for (key, value) in map_literal.pairs.iter() {
-            let key_value = match key {
-                HashableExpression::StringLiteral(string_literal) => &string_literal.token.literal,
-                _ => panic!("not a string literal"),
+        for (i, (key, value)) in map_literal.pairs.iter().enumerate() {
+            let (ref expected_key, ref test_func) = expected[i];
+            match key {
+                Expression::StringLiteral(string_literal) => {
+                    assert_eq!(*expected_key, string_literal.token.literal);
+                }
+                _ => panic!("not a  string literal"),
             };
-            let test_func = expected.get(key_value).unwrap();
             test_func(value);
         }
     }
