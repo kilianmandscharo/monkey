@@ -34,11 +34,13 @@ impl Lexer {
 
         let tok = match self.ch {
             ';' => Token::new(TokenType::Semicolon, self.ch),
-            '}' => Token::new(TokenType::RBrace, self.ch),
             ',' => Token::new(TokenType::Comma, self.ch),
             '(' => Token::new(TokenType::LParen, self.ch),
             ')' => Token::new(TokenType::RParen, self.ch),
             '{' => Token::new(TokenType::LBrace, self.ch),
+            '}' => Token::new(TokenType::RBrace, self.ch),
+            '[' => Token::new(TokenType::LBracket, self.ch),
+            ']' => Token::new(TokenType::RBracket, self.ch),
             '+' => Token::new(TokenType::Plus, self.ch),
             '-' => Token::new(TokenType::Minus, self.ch),
             '*' => Token::new(TokenType::Asterisk, self.ch),
@@ -172,6 +174,7 @@ mod tests {
 
             "foobar";
             "foo bar";
+            [1, 2];
         "#;
         let tests: Vec<Test> = vec![
             (TokenType::Let, "let"),
@@ -250,6 +253,12 @@ mod tests {
             (TokenType::String, "foobar"),
             (TokenType::Semicolon, ";"),
             (TokenType::String, "foo bar"),
+            (TokenType::Semicolon, ";"),
+            (TokenType::LBracket, "["),
+            (TokenType::Int, "1"),
+            (TokenType::Comma, ","),
+            (TokenType::Int, "2"),
+            (TokenType::RBracket, "]"),
             (TokenType::Semicolon, ";"),
             (TokenType::Eof, "\0"),
         ];

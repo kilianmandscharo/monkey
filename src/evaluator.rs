@@ -1,8 +1,7 @@
-use std::collections::HashMap;
-
 use crate::ast::{Expression, Identifier, IfExpression, Node, Statement};
 use crate::environment::Environment;
-use crate::object::{Boolean, Builtin, Function, Integer, Object, ReturnValue, StringObj};
+use crate::object::{Array, Boolean, Builtin, Function, Integer, Object, ReturnValue, StringObj};
+use std::collections::HashMap;
 
 pub struct Evaluator {
     builtins: HashMap<&'static str, Builtin>,
@@ -128,8 +127,47 @@ impl Evaluator {
                 Expression::StringLiteral(string_literal) => Object::StringObj(StringObj {
                     value: string_literal.token.literal,
                 }),
+                Expression::ArrayLiteral(array_literal) => {
+                    let mut elements = self.eval_expressions(array_literal.elements, env);
+                    if elements.len() == 1 && elements[0].is_error() {
+                        elements.swap_remove(0)
+                    } else {
+                        Object::Array(Array { elements })
+                    }
+                }
+                Expression::IndexExpression(index_expression) => {
+                    let left = self.eval(Node::Expression(*index_expression.left), env.clone());
+                    if left.is_error() {
+                        return left;
+                    }
+                    let index = self.eval(Node::Expression(*index_expression.index), env);
+                    if index.is_error() {
+                        return index;
+                    }
+                    return self.eval_index_expression(left, index);
+                }
                 Expression::Empty() => panic!("you should not be here"),
             },
+        }
+    }
+
+    fn eval_index_expression(&self, left: Object, index: Object) -> Object {
+        if let Object::Array(array) = left {
+            if let Object::Integer(index) = index {
+                return self.eval_array_index_expression(array, index);
+            } else {
+                Object::new_error(format!("can't index array with: {}", index.get_type()))
+            }
+        } else {
+            Object::new_error(format!("index operator not supported: {}", left.get_type()))
+        }
+    }
+
+    fn eval_array_index_expression(&self, array: Array, index: Integer) -> Object {
+        if index.value < 0 || index.value as usize >= array.elements.len() {
+            Object::new_null()
+        } else {
+            array.elements[index.value as usize].clone()
         }
     }
 
@@ -405,7 +443,7 @@ mod tests {
         for test in tests {
             let (input, expected) = test;
             let evaluated = test_eval(input);
-            test_integer_object(evaluated, expected);
+            test_integer_object(&evaluated, expected);
         }
     }
 
@@ -471,7 +509,7 @@ mod tests {
             let (input, expected) = test;
             let evaluated = test_eval(input);
             if let Some(expected_int) = expected {
-                test_integer_object(evaluated, expected_int);
+                test_integer_object(&evaluated, expected_int);
             } else {
                 test_null_object(evaluated);
             }
@@ -495,7 +533,7 @@ mod tests {
         for test in tests {
             let (input, expected) = test;
             let evaluated = test_eval(input);
-            test_integer_object(evaluated, expected);
+            test_integer_object(&evaluated, expected);
         }
     }
 
@@ -539,7 +577,7 @@ mod tests {
         ];
         for test in tests {
             let (input, expected) = test;
-            test_integer_object(test_eval(input), expected);
+            test_integer_object(&test_eval(input), expected);
         }
     }
 
@@ -568,7 +606,7 @@ mod tests {
         ];
         for test in tests {
             let (input, expected) = test;
-            test_integer_object(test_eval(input), expected);
+            test_integer_object(&test_eval(input), expected);
         }
     }
 
@@ -576,7 +614,7 @@ mod tests {
     fn test_closures() {
         let input =
             "let a = 1; let newAdder = fn(x) { fn(y) { x + y + a }; }; let addTwo = newAdder(2); addTwo(2);";
-        test_integer_object(test_eval(input), 5);
+        test_integer_object(&test_eval(input), 5);
     }
 
     #[test]
@@ -617,12 +655,57 @@ mod tests {
             let (input, expected) = test;
             let evaluated = test_eval(input);
             if let Some(integer) = expected.downcast_ref::<i64>() {
-                test_integer_object(evaluated, *integer);
+                test_integer_object(&evaluated, *integer);
             } else if let Some(string) = expected.downcast_ref::<&str>() {
                 match evaluated {
                     Object::Error(error) => assert_eq!(*string, error.message),
                     _ => panic!("not an error object"),
                 }
+            }
+        }
+    }
+
+    #[test]
+    fn test_array_literals() {
+        let input = "[1, 2 * 2, 3 + 3];";
+        let evaluated = test_eval(input);
+        let array = match evaluated {
+            Object::Array(array) => array,
+            _ => panic!("not an array object"),
+        };
+        assert_eq!(3, array.elements.len());
+        test_integer_object(&array.elements[0], 1);
+        test_integer_object(&array.elements[1], 4);
+        test_integer_object(&array.elements[2], 6);
+    }
+
+    #[test]
+    fn test_array_index_expressions() {
+        let tests: Vec<(&'static str, Option<i64>)> = vec![
+            ("[1, 2, 3][0]", Some(1)),
+            ("[1, 2, 3][1]", Some(2)),
+            ("[1, 2, 3][2]", Some(3)),
+            ("[1, 2, 3][1 + 1];", Some(3)),
+            ("let i = 0; [1][i];", Some(1)),
+            ("let myArray = [1, 2, 3]; myArray[2];", Some(3)),
+            (
+                "let myArray = [1, 2, 3]; myArray[0] + myArray[1] + myArray[2];",
+                Some(6),
+            ),
+            (
+                "let myArray = [1, 2, 3]; let i = myArray[0]; myArray[i]",
+                Some(2),
+            ),
+            ("[1, 2, 3][3]", None),
+            ("[1, 2, 3][-1]", None),
+        ];
+        for test in tests {
+            let (input, expected) = test;
+            let evaluated = test_eval(input);
+            if let Some(int) = expected {
+                test_integer_object(&evaluated, int);
+            } else {
+                test_null_object(evaluated);
             }
         }
     }
@@ -635,7 +718,7 @@ mod tests {
         evaluator.eval(Node::Program(program), env)
     }
 
-    fn test_integer_object(obj: Object, expected: i64) {
+    fn test_integer_object(obj: &Object, expected: i64) {
         let integer_object = match obj {
             Object::Integer(integer) => integer,
             _ => panic!("not an integer object"),

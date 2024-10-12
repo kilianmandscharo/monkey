@@ -15,6 +15,7 @@ pub enum Object {
     Function(Function),
     StringObj(StringObj),
     Builtin(Builtin),
+    Array(Array),
 }
 
 impl Object {
@@ -40,6 +41,7 @@ impl Object {
             Object::Function(_) => "Function".to_string(),
             Object::StringObj(_) => "String".to_string(),
             Object::Builtin(_) => "Builtin".to_string(),
+            Object::Array(_) => "Array".to_string(),
         }
     }
     pub fn is_error(&self) -> bool {
@@ -61,6 +63,7 @@ impl std::fmt::Display for Object {
             Object::Function(function) => function.to_string(),
             Object::StringObj(string_obj) => string_obj.to_string(),
             Object::Builtin(builtin) => builtin.to_string(),
+            Object::Array(array) => array.to_string(),
         };
         write!(f, "{content}")
     }
@@ -98,6 +101,25 @@ pub struct Builtin {
 impl std::fmt::Display for Builtin {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "builtin function")
+    }
+}
+
+#[derive(Clone)]
+pub struct Array {
+    pub elements: Vec<Object>,
+}
+
+impl std::fmt::Display for Array {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "[{}]",
+            self.elements
+                .iter()
+                .map(|el| el.to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
     }
 }
 

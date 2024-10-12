@@ -275,6 +275,26 @@ impl std::fmt::Display for FunctionLiteral {
 }
 
 #[derive(Clone)]
+pub struct ArrayLiteral {
+    pub token: Token,
+    pub elements: Vec<Expression>,
+}
+
+impl std::fmt::Display for ArrayLiteral {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "[{}]",
+            self.elements
+                .iter()
+                .map(|exp| exp.to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
+    }
+}
+
+#[derive(Clone)]
 pub struct CallExpression {
     pub token: Token,
     pub function: Box<Expression>,
@@ -297,6 +317,19 @@ impl std::fmt::Display for CallExpression {
 }
 
 #[derive(Clone)]
+pub struct IndexExpression {
+    pub token: Token,
+    pub left: Box<Expression>,
+    pub index: Box<Expression>,
+}
+
+impl std::fmt::Display for IndexExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({}[{}])", self.left.to_string(), self.index.to_string())
+    }
+}
+
+#[derive(Clone)]
 pub enum Expression {
     Empty(),
     Identifier(Identifier),
@@ -308,6 +341,8 @@ pub enum Expression {
     FunctionLiteral(FunctionLiteral),
     CallExpression(CallExpression),
     StringLiteral(StringLiteral),
+    ArrayLiteral(ArrayLiteral),
+    IndexExpression(IndexExpression),
 }
 
 impl std::fmt::Display for Expression {
@@ -323,6 +358,8 @@ impl std::fmt::Display for Expression {
             Expression::FunctionLiteral(function_literal) => function_literal.to_string(),
             Expression::CallExpression(call_expression) => call_expression.to_string(),
             Expression::StringLiteral(string_literal) => string_literal.to_string(),
+            Expression::ArrayLiteral(array_literal) => array_literal.to_string(),
+            Expression::IndexExpression(index_expression) => index_expression.to_string(),
         };
         write!(f, "{}", content)
     }
