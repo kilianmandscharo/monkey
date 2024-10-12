@@ -1,4 +1,5 @@
 use crate::token::Token;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct ParsingError {
@@ -155,7 +156,7 @@ impl std::fmt::Display for Identifier {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Hash)]
 pub struct IntegerLiteral {
     pub token: Token,
     pub value: i64,
@@ -200,7 +201,7 @@ impl std::fmt::Display for InfixExpression {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Hash)]
 pub struct Boolean {
     pub token: Token,
     pub value: bool,
@@ -212,7 +213,7 @@ impl std::fmt::Display for Boolean {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Hash)]
 pub struct StringLiteral {
     pub token: Token,
 }
@@ -330,6 +331,60 @@ impl std::fmt::Display for IndexExpression {
 }
 
 #[derive(Clone)]
+pub struct MapLiteral {
+    pub token: Token,
+    pub pairs: HashMap<HashableExpression, Expression>,
+}
+
+impl std::fmt::Display for MapLiteral {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{{{}}}",
+            self.pairs
+                .iter()
+                .map(|pair| format!("{}:{}", pair.0.to_string(), pair.1.to_string()))
+                .collect::<Vec<_>>()
+                .join(",")
+        )
+    }
+}
+
+#[derive(Clone, PartialEq, Hash)]
+pub enum HashableExpression {
+    IntegerLiteral(IntegerLiteral),
+    StringLiteral(StringLiteral),
+    Boolean(Boolean),
+}
+
+impl HashableExpression {
+    pub fn to_expression(self) -> Expression {
+        match self {
+            HashableExpression::Boolean(boolean) => Expression::Boolean(boolean),
+            HashableExpression::StringLiteral(string_literal) => {
+                Expression::StringLiteral(string_literal)
+            }
+            HashableExpression::IntegerLiteral(integer_literal) => {
+                Expression::IntegerLiteral(integer_literal)
+            }
+        }
+    }
+}
+
+impl Eq for HashableExpression {}
+
+impl std::fmt::Display for HashableExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let content = match self {
+            HashableExpression::IntegerLiteral(integer_literal) => integer_literal.to_string(),
+            HashableExpression::Boolean(boolean) => boolean.to_string(),
+            HashableExpression::StringLiteral(string_literal) => string_literal.to_string(),
+        };
+        write!(f, "{}", content)
+    }
+}
+
+#[derive(Clone)]
 pub enum Expression {
     Empty(),
     Identifier(Identifier),
@@ -343,6 +398,27 @@ pub enum Expression {
     StringLiteral(StringLiteral),
     ArrayLiteral(ArrayLiteral),
     IndexExpression(IndexExpression),
+    MapLiteral(MapLiteral),
+}
+
+impl Expression {
+    pub fn to_hashable_expression(self) -> Result<HashableExpression> {
+        match self {
+            Expression::StringLiteral(string_literal) => {
+                Ok(HashableExpression::StringLiteral(string_literal))
+            }
+            Expression::Boolean(boolean) => Ok(HashableExpression::Boolean(boolean)),
+            Expression::IntegerLiteral(integer_literal) => {
+                Ok(HashableExpression::IntegerLiteral(integer_literal))
+            }
+            _ => Err(ParsingError {
+                message: format!(
+                    "can't transform to HashableExpression: {}",
+                    self.to_string()
+                ),
+            }),
+        }
+    }
 }
 
 impl std::fmt::Display for Expression {
@@ -360,6 +436,7 @@ impl std::fmt::Display for Expression {
             Expression::StringLiteral(string_literal) => string_literal.to_string(),
             Expression::ArrayLiteral(array_literal) => array_literal.to_string(),
             Expression::IndexExpression(index_expression) => index_expression.to_string(),
+            Expression::MapLiteral(map_literal) => map_literal.to_string(),
         };
         write!(f, "{}", content)
     }

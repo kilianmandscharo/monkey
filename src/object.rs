@@ -1,9 +1,32 @@
-use std::ops::{Add, Div, Mul, Sub};
+use std::{
+    collections::HashMap,
+    ops::{Add, Div, Mul, Sub},
+};
 
 use crate::{
     ast::{BlockStatement, Identifier},
     environment::Environment,
 };
+
+#[derive(Clone, PartialEq, Hash)]
+pub enum HashableObject {
+    Integer(Integer),
+    Boolean(Boolean),
+    StringObj(StringObj),
+}
+
+impl Eq for HashableObject {}
+
+impl std::fmt::Display for HashableObject {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let content = match self {
+            HashableObject::Integer(integer) => integer.to_string(),
+            HashableObject::Boolean(boolean) => boolean.to_string(),
+            HashableObject::StringObj(string_obj) => string_obj.to_string(),
+        };
+        write!(f, "{content}")
+    }
+}
 
 #[derive(Clone)]
 pub enum Object {
@@ -16,6 +39,7 @@ pub enum Object {
     StringObj(StringObj),
     Builtin(Builtin),
     Array(Array),
+    Map(Map),
 }
 
 impl Object {
@@ -42,12 +66,21 @@ impl Object {
             Object::StringObj(_) => "String".to_string(),
             Object::Builtin(_) => "Builtin".to_string(),
             Object::Array(_) => "Array".to_string(),
+            Object::Map(_) => "Map".to_string(),
         }
     }
     pub fn is_error(&self) -> bool {
         match *self {
             Object::Error(_) => true,
             _ => false,
+        }
+    }
+    pub fn to_hashable_object(self) -> HashableObject {
+        match self {
+            Object::Integer(integer) => HashableObject::Integer(integer),
+            Object::StringObj(string) => HashableObject::StringObj(string),
+            Object::Boolean(boolean) => HashableObject::Boolean(boolean),
+            _ => panic!("can't transform to HashableObject: {}", self.to_string()),
         }
     }
 }
@@ -64,6 +97,7 @@ impl std::fmt::Display for Object {
             Object::StringObj(string_obj) => string_obj.to_string(),
             Object::Builtin(builtin) => builtin.to_string(),
             Object::Array(array) => array.to_string(),
+            Object::Map(map) => map.to_string(),
         };
         write!(f, "{content}")
     }
@@ -124,6 +158,25 @@ impl std::fmt::Display for Array {
 }
 
 #[derive(Clone)]
+pub struct Map {
+    pub pairs: HashMap<HashableObject, Object>,
+}
+
+impl std::fmt::Display for Map {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{{{}}}",
+            self.pairs
+                .iter()
+                .map(|pair| format!("{}:{}", pair.0.to_string(), pair.1.to_string()))
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
+    }
+}
+
+#[derive(Clone, PartialEq, Hash)]
 pub struct StringObj {
     pub value: String,
 }
@@ -156,7 +209,7 @@ impl std::fmt::Display for ReturnValue {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Hash)]
 pub struct Integer {
     pub value: i64,
 }
@@ -215,7 +268,7 @@ impl PartialOrd for Integer {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Hash)]
 pub struct Boolean {
     pub value: bool,
 }

@@ -21,6 +21,7 @@ pub enum TokenType {
     // Delimiters
     Comma,
     Semicolon,
+    Colon,
 
     LParen,
     RParen,
@@ -42,7 +43,7 @@ pub enum TokenType {
     NotEq,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Hash)]
 pub struct Token {
     pub t: TokenType,
     pub literal: String,

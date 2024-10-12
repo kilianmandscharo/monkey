@@ -1,6 +1,8 @@
-use crate::ast::{Expression, Identifier, IfExpression, Node, Statement};
+use crate::ast::{Expression, Identifier, IfExpression, MapLiteral, Node, Statement};
 use crate::environment::Environment;
-use crate::object::{Array, Boolean, Builtin, Function, Integer, Object, ReturnValue, StringObj};
+use crate::object::{
+    Array, Boolean, Builtin, Function, HashableObject, Integer, Map, Object, ReturnValue, StringObj,
+};
 use std::collections::HashMap;
 
 pub struct Evaluator {
@@ -31,8 +33,116 @@ impl Evaluator {
                         Object::StringObj(ref string) => Object::Integer(Integer {
                             value: string.value.len() as i64,
                         }),
+                        Object::Array(ref array) => Object::Integer(Integer {
+                            value: array.elements.len() as i64,
+                        }),
                         _ => Object::new_error(format!(
                             "argument to 'len' not supported, got {}",
+                            args[0].get_type()
+                        )),
+                    }
+                },
+            },
+        );
+        self.builtins.insert(
+            "first",
+            Builtin {
+                func: |args| {
+                    if args.len() != 1 {
+                        return Object::new_error(format!(
+                            "wrong number of arguments, got={}, want=1",
+                            args.len()
+                        ));
+                    }
+                    match args[0] {
+                        Object::Array(ref array) => {
+                            if array.elements.len() > 0 {
+                                array.elements[0].clone()
+                            } else {
+                                Object::new_null()
+                            }
+                        }
+                        _ => Object::new_error(format!(
+                            "argument to 'first' not supported, got {}",
+                            args[0].get_type()
+                        )),
+                    }
+                },
+            },
+        );
+        self.builtins.insert(
+            "rest",
+            Builtin {
+                func: |args| {
+                    if args.len() != 1 {
+                        return Object::new_error(format!(
+                            "wrong number of arguments, got={}, want=1",
+                            args.len()
+                        ));
+                    }
+                    match args[0] {
+                        Object::Array(ref array) => {
+                            let len = array.elements.len();
+                            if len > 0 {
+                                Object::Array(Array {
+                                    elements: array.elements[1..].to_vec(),
+                                })
+                            } else {
+                                Object::new_null()
+                            }
+                        }
+                        _ => Object::new_error(format!(
+                            "argument to 'first' not supported, got {}",
+                            args[0].get_type()
+                        )),
+                    }
+                },
+            },
+        );
+        self.builtins.insert(
+            "last",
+            Builtin {
+                func: |args| {
+                    if args.len() != 1 {
+                        return Object::new_error(format!(
+                            "wrong number of arguments, got={}, want=1",
+                            args.len()
+                        ));
+                    }
+                    match args[0] {
+                        Object::Array(ref array) => {
+                            if array.elements.len() > 0 {
+                                array.elements[array.elements.len() - 1].clone()
+                            } else {
+                                Object::new_null()
+                            }
+                        }
+                        _ => Object::new_error(format!(
+                            "argument to 'first' not supported, got {}",
+                            args[0].get_type()
+                        )),
+                    }
+                },
+            },
+        );
+        self.builtins.insert(
+            "push",
+            Builtin {
+                func: |args| {
+                    if args.len() != 2 {
+                        return Object::new_error(format!(
+                            "wrong number of arguments, got={}, want=2",
+                            args.len()
+                        ));
+                    }
+                    match args[0] {
+                        Object::Array(ref array) => {
+                            let mut elements = array.elements.clone();
+                            elements.push(args[1].clone());
+                            Object::Array(Array { elements })
+                        }
+                        _ => Object::new_error(format!(
+                            "argument to 'first' not supported, got {}",
                             args[0].get_type()
                         )),
                     }
@@ -146,9 +256,25 @@ impl Evaluator {
                     }
                     return self.eval_index_expression(left, index);
                 }
+                Expression::MapLiteral(map_literal) => self.eval_map_literal(map_literal, env),
                 Expression::Empty() => panic!("you should not be here"),
             },
         }
+    }
+
+    fn eval_map_literal(&self, map: MapLiteral, env: Environment) -> Object {
+        let mut pairs = HashMap::new();
+        for (key_node, value_node) in map.pairs.into_iter() {
+            let key = self
+                .eval(Node::Expression(key_node.to_expression()), env.clone())
+                .to_hashable_object();
+            let value = self.eval(Node::Expression(value_node), env.clone());
+            if value.is_error() {
+                return value;
+            }
+            pairs.insert(key, value);
+        }
+        Object::Map(Map { pairs })
     }
 
     fn eval_index_expression(&self, left: Object, index: Object) -> Object {
@@ -158,8 +284,18 @@ impl Evaluator {
             } else {
                 Object::new_error(format!("can't index array with: {}", index.get_type()))
             }
+        } else if let Object::Map(map) = left {
+            self.eval_map_index_expressions(map, index.to_hashable_object())
         } else {
             Object::new_error(format!("index operator not supported: {}", left.get_type()))
+        }
+    }
+
+    fn eval_map_index_expressions(&self, map: Map, index: HashableObject) -> Object {
+        if let Some(obj) = map.pairs.get(&index) {
+            obj.clone()
+        } else {
+            Object::new_null()
         }
     }
 
@@ -416,7 +552,11 @@ mod tests {
     use std::any::Any;
 
     use crate::{
-        ast::Node, environment::Environment, lexer::Lexer, object::Object, parser::Parser,
+        ast::Node,
+        environment::Environment,
+        lexer::Lexer,
+        object::{Boolean, HashableObject, Integer, Object, StringObj},
+        parser::Parser,
     };
 
     use super::Evaluator;
@@ -654,8 +794,8 @@ mod tests {
         for test in tests {
             let (input, expected) = test;
             let evaluated = test_eval(input);
-            if let Some(integer) = expected.downcast_ref::<i64>() {
-                test_integer_object(&evaluated, *integer);
+            if let Some(integer) = expected.downcast_ref::<i32>() {
+                test_integer_object(&evaluated, *integer as i64);
             } else if let Some(string) = expected.downcast_ref::<&str>() {
                 match evaluated {
                     Object::Error(error) => assert_eq!(*string, error.message),
@@ -663,6 +803,73 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn test_first() {
+        let input = "first([1, 2, 3])";
+        let evaluated = test_eval(input);
+        test_integer_object(&evaluated, 1);
+
+        let input = "first([])";
+        let evaluated = test_eval(input);
+        test_null_object(evaluated);
+
+        let input = "first([], 1)";
+        let evaluated = test_eval(input);
+        test_error_object(&evaluated, "wrong number of arguments, got=2, want=1");
+    }
+
+    #[test]
+    fn test_last() {
+        let input = "last([1, 2, 3])";
+        let evaluated = test_eval(input);
+        test_integer_object(&evaluated, 3);
+
+        let input = "last([])";
+        let evaluated = test_eval(input);
+        test_null_object(evaluated);
+
+        let input = "last([], 1)";
+        let evaluated = test_eval(input);
+        test_error_object(&evaluated, "wrong number of arguments, got=2, want=1");
+    }
+
+    #[test]
+    fn test_rest() {
+        let input = "rest([1, 2, 3])";
+        let evaluated = test_eval(input);
+        if let Object::Array(array) = evaluated {
+            assert_eq!(2, array.elements.len());
+            test_integer_object(&array.elements[0], 2);
+            test_integer_object(&array.elements[1], 3);
+        } else {
+            panic!("not an array object");
+        }
+
+        let input = "rest([])";
+        let evaluated = test_eval(input);
+        test_null_object(evaluated);
+
+        let input = "rest([], 1)";
+        let evaluated = test_eval(input);
+        test_error_object(&evaluated, "wrong number of arguments, got=2, want=1");
+    }
+
+    #[test]
+    fn test_push() {
+        let input = "push([], 1);";
+        let evaluated = test_eval(input);
+        if let Object::Array(array) = evaluated {
+            assert_eq!(1, array.elements.len());
+            test_integer_object(&array.elements[0], 1);
+        } else {
+            panic!("not an array object");
+        }
+
+        let input = "push([], 1, 2);";
+        let evaluated = test_eval(input);
+        test_error_object(&evaluated, "wrong number of arguments, got=3, want=2");
     }
 
     #[test]
@@ -709,6 +916,63 @@ mod tests {
             }
         }
     }
+    #[test]
+    fn test_map_literals() {
+        let input = r#"
+            {
+                "one": 10 - 9,
+                4: 4,
+                true: 5,
+                false: 6
+            };"#;
+
+        let evaluated = test_eval(input);
+        let map = match evaluated {
+            Object::Map(map) => map,
+            _ => panic!("not a map object"),
+        };
+
+        let expected = vec![
+            (
+                HashableObject::StringObj(StringObj {
+                    value: "one".to_string(),
+                }),
+                1,
+            ),
+            (HashableObject::Integer(Integer { value: 4 }), 4),
+            (HashableObject::Boolean(Boolean { value: true }), 5),
+            (HashableObject::Boolean(Boolean { value: false }), 6),
+        ];
+
+        assert_eq!(expected.len(), map.pairs.len());
+
+        for (key, value) in expected.into_iter() {
+            test_integer_object(map.pairs.get(&key).unwrap(), value);
+        }
+    }
+
+    #[test]
+    fn test_map_index_expressions() {
+        let tests = vec![
+            (r#"{"foo": 5}["foo"]"#, Some(5)),
+            (r#"{"foo": 5}["bar"]"#, None),
+            (r#"let key = "foo"; {"foo": 5}[key]"#, Some(5)),
+            (r#"{}["foo"]"#, None),
+            (r#"{5: 5}[5]"#, Some(5)),
+            (r#"{true: 5}[true]"#, Some(5)),
+            (r#"{false: 5}[false]"#, Some(5)),
+        ];
+
+        for test in tests {
+            let (input, expected) = test;
+            let evaluated = test_eval(input);
+            if let Some(num) = expected {
+                test_integer_object(&evaluated, num);
+            } else {
+                test_null_object(evaluated);
+            }
+        }
+    }
 
     fn test_eval(input: &str) -> Object {
         let mut parser = Parser::new(Lexer::new(input));
@@ -724,6 +988,14 @@ mod tests {
             _ => panic!("not an integer object"),
         };
         assert_eq!(expected, integer_object.value);
+    }
+
+    fn test_error_object(obj: &Object, expected: &str) {
+        let error_object = match obj {
+            Object::Error(error) => error,
+            _ => panic!("not an error object"),
+        };
+        assert_eq!(expected, error_object.message);
     }
 
     fn test_null_object(obj: Object) {
